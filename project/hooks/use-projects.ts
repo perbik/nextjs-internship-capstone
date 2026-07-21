@@ -57,13 +57,14 @@ Dependencies to install:
 
 // Placeholder to prevent import errors
 export function useProjects() {
-  console.log("TODO: Implement useProjects hook")
-  return {
-    projects: [],
-    isLoading: false,
-    error: null,
-    createProject: (data: any) => console.log("TODO: Create project", data),
-    updateProject: (id: string, data: any) => console.log(`TODO: Update project ${id}`, data),
-    deleteProject: (id: string) => console.log(`TODO: Delete project ${id}`),
-  }
+	console.log("TODO: Implement useProjects hook");
+	return {
+		projects: [],
+		isLoading: false,
+		error: null,
+		createProject: (data: unknown) => console.log("TODO: Create project", data),
+		updateProject: (id: string, data: unknown) =>
+			console.log(`TODO: Update project ${id}`, data),
+		deleteProject: (id: string) => console.log(`TODO: Delete project ${id}`),
+	};
 }

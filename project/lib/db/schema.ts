@@ -37,8 +37,8 @@ export const users = pgTable('users', {
 */
 
 // Placeholder exports to prevent import errors
-export const users = "TODO: Implement users table schema"
-export const projects = "TODO: Implement projects table schema"
-export const lists = "TODO: Implement lists table schema"
-export const tasks = "TODO: Implement tasks table schema"
-export const comments = "TODO: Implement comments table schema"
+export const users = "TODO: Implement users table schema";
+export const projects = "TODO: Implement projects table schema";
+export const lists = "TODO: Implement lists table schema";
+export const tasks = "TODO: Implement tasks table schema";
+export const comments = "TODO: Implement comments table schema";

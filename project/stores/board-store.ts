@@ -58,13 +58,15 @@ export const useBoardStore = create<BoardState>()(
 
 // Placeholder to prevent import errors
 export const useBoardStore = () => {
-  console.log("TODO: Implement board store with Zustand")
-  return {
-    currentProject: null,
-    lists: [],
-    tasks: [],
-    isLoading: false,
-    loadProject: (projectId: string) => console.log(`TODO: Load project ${projectId}`),
-    createTask: (listId: string, task: any) => console.log(`TODO: Create task in list ${listId}`, task),
-  }
-}
+	console.log("TODO: Implement board store with Zustand");
+	return {
+		currentProject: null,
+		lists: [],
+		tasks: [],
+		isLoading: false,
+		loadProject: (projectId: string) =>
+			console.log(`TODO: Load project ${projectId}`),
+		createTask: (listId: string, task: unknown) =>
+			console.log(`TODO: Create task in list ${listId}`, task),
+	};
+};

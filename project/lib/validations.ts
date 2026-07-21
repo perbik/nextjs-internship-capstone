@@ -34,8 +34,8 @@ export const taskSchema = z.object({
 */
 
 // Placeholder exports to prevent import errors
-export const projectSchema = "TODO: Implement project validation schema"
-export const taskSchema = "TODO: Implement task validation schema"
-export const userSchema = "TODO: Implement user validation schema"
-export const listSchema = "TODO: Implement list validation schema"
-export const commentSchema = "TODO: Implement comment validation schema"
+export const projectSchema = "TODO: Implement project validation schema";
+export const taskSchema = "TODO: Implement task validation schema";
+export const userSchema = "TODO: Implement user validation schema";
+export const listSchema = "TODO: Implement list validation schema";
+export const commentSchema = "TODO: Implement comment validation schema";

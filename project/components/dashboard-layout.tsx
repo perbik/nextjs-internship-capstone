@@ -49,7 +49,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 			>
 				<div className="flex items-center justify-between h-16 px-6 border-b border-french_gray-300 dark:border-paynes_gray-400">
 					<Link href="/" className="text-2xl font-bold text-blue_munsell-500">
-						TaskFlow
+						ProjectFlow
 					</Link>
 					<button
 						type="button"

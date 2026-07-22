@@ -1,3 +1,4 @@
+import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import { ArrowRight, CheckCircle, Kanban, Users } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -14,30 +15,39 @@ export default function HomePage() {
 						</div>
 						<div className="flex items-center space-x-4">
 							<ThemeToggle />
-							<Link
-								href="/dashboard"
-								className="text-outer_space-500 dark:text-platinum-500 hover:text-blue_munsell-500"
-							>
-								Dashboard
-							</Link>
-							<Link
-								href="/projects"
-								className="text-outer_space-500 dark:text-platinum-500 hover:text-blue_munsell-500"
-							>
-								Projects
-							</Link>
-							<Link
-								href="/sign-in"
-								className="text-outer_space-500 dark:text-platinum-500 hover:text-blue_munsell-500"
-							>
-								Sign In
-							</Link>
-							<Link
-								href="/sign-up"
-								className="px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600"
-							>
-								Get Started
-							</Link>
+							<Show when="signed-in">
+								<Link
+									href="/dashboard"
+									className="text-outer_space-500 hover:text-blue_munsell-500 dark:text-platinum-500"
+								>
+									Dashboard
+								</Link>
+								<Link
+									href="/projects"
+									className="text-outer_space-500 hover:text-blue_munsell-500 dark:text-platinum-500"
+								>
+									Projects
+								</Link>
+								<UserButton />
+							</Show>
+							<Show when="signed-out">
+								<SignInButton mode="redirect">
+									<button
+										type="button"
+										className="text-outer_space-500 hover:text-blue_munsell-500 dark:text-platinum-500"
+									>
+										Sign In
+									</button>
+								</SignInButton>
+								<SignUpButton mode="redirect">
+									<button
+										type="button"
+										className="rounded-lg bg-blue_munsell-500 px-4 py-2 text-white hover:bg-blue_munsell-600"
+									>
+										Get Started
+									</button>
+								</SignUpButton>
+							</Show>
 						</div>
 					</div>
 				</div>
@@ -146,7 +156,7 @@ export default function HomePage() {
 								Auth Pages
 							</h3>
 							<p className="text-sm text-paynes_gray-500 dark:text-french_gray-400">
-								Sign in/up placeholders
+								Sign in or create an account
 							</p>
 						</Link>
 					</div>

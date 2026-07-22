@@ -1,5 +1,6 @@
 "use client";
 
+import { UserButton } from "@clerk/nextjs";
 import {
 	BarChart3,
 	Calendar,
@@ -102,9 +103,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 								{theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
 							</button>
 
-							<div className="w-8 h-8 bg-blue_munsell-500 rounded-full flex items-center justify-center text-white font-semibold">
-								U
-							</div>
+							<UserButton />
 						</div>
 					</div>
 				</div>

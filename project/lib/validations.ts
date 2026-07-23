@@ -98,6 +98,7 @@ export const userSchema = userProfileSchema;
 export const listSchema = z.object({
 	name: requiredText("List name", 100),
 	position: optionalPosition,
+	isCompleted: z.boolean().optional(),
 });
 
 export const listCreateSchema = listSchema.extend({

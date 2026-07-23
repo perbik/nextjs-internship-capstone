@@ -40,6 +40,7 @@ export interface List {
 	projectId: string;
 	name: string;
 	position: number;
+	isCompleted: boolean;
 	createdAt: Date;
 	updatedAt: Date;
 }

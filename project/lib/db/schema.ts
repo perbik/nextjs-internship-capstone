@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+	boolean,
 	index,
 	integer,
 	pgEnum,
@@ -94,6 +95,7 @@ export const lists = pgTable(
 			.references(() => projects.id, { onDelete: "cascade" }),
 		name: text("name").notNull(),
 		position: integer("position").default(0).notNull(),
+		isCompleted: boolean("is_completed").default(false).notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),

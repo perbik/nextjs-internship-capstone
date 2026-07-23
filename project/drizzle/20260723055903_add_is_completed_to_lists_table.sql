@@ -1,0 +1,1 @@
+ALTER TABLE "lists" ADD COLUMN "is_completed" boolean DEFAULT false NOT NULL;

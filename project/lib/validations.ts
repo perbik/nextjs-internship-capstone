@@ -1,41 +1,129 @@
-// TODO: Task 3.6 - Set up data validation with Zod schemas
+import { z } from "zod";
 
-/*
-TODO: Implementation Notes for Interns:
+const PROJECT_STATUSES = ["active", "completed", "on_hold"] as const;
+const TASK_PRIORITIES = ["low", "medium", "high"] as const;
 
-1. Install Zod: pnpm add zod
-2. Create validation schemas for all forms and API endpoints
-3. Add proper error messages
-4. Set up client and server-side validation
+const requiredText = (field: string, maximum: number) =>
+	z
+		.string({ error: `${field} must be text` })
+		.trim()
+		.min(1, `${field} is required`)
+		.max(maximum, `${field} must be ${maximum} characters or fewer`);
 
-Example schemas needed:
-- Project creation/update
-- Task creation/update
-- User profile update
-- List/column management
-- Comment creation
+const optionalText = (field: string, maximum: number) =>
+	z.preprocess(
+		(value) =>
+			typeof value === "string" && value.trim() === "" ? undefined : value,
+		z
+			.string({ error: `${field} must be text` })
+			.trim()
+			.max(maximum, `${field} must be ${maximum} characters or fewer`)
+			.optional(),
+	);
 
-Example structure:
-import { z } from 'zod'
+const optionalUuid = (field: string) =>
+	z.preprocess(
+		(value) => (value === "" || value === null ? undefined : value),
+		z.uuid(`${field} must be a valid ID`).optional(),
+	);
+
+const optionalDate = (field: string) =>
+	z.preprocess(
+		(value) => (value === "" || value === null ? undefined : value),
+		z.coerce.date({ error: `${field} must be a valid date` }).optional(),
+	);
+
+const optionalPosition = z.preprocess(
+	(value) => (value === "" || value === null ? undefined : value),
+	z.coerce
+		.number({ error: "Position must be a number" })
+		.int("Position must be a whole number")
+		.nonnegative("Position cannot be negative")
+		.optional(),
+);
+
+const hasUpdate = (data: Record<string, unknown>) =>
+	Object.values(data).some((value) => value !== undefined);
+
+const futureOptionalDate = (field: string) =>
+	optionalDate(field).refine((date) => !date || date > new Date(), {
+		message: `${field} must be in the future`,
+	});
 
 export const projectSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
-  description: z.string().max(500, 'Description too long').optional(),
-  dueDate: z.date().min(new Date(), 'Due date must be in future').optional(),
-})
+	name: requiredText("Name", 100),
+	description: optionalText("Description", 500),
+	dueDate: futureOptionalDate("Due date"),
+});
+
+export const projectCreateSchema = projectSchema;
+
+export const projectUpdateSchema = projectSchema
+	.extend({
+		status: z.enum(PROJECT_STATUSES, {
+			error: "Status must be active, completed, or on hold",
+		}),
+	})
+	.partial()
+	.refine(hasUpdate, { message: "At least one project field is required" });
 
 export const taskSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200, 'Title too long'),
-  description: z.string().max(1000, 'Description too long').optional(),
-  priority: z.enum(['low', 'medium', 'high']),
-  dueDate: z.date().optional(),
-  assigneeId: z.string().uuid().optional(),
-})
-*/
+	title: requiredText("Title", 200),
+	description: optionalText("Description", 1000),
+	priority: z.enum(TASK_PRIORITIES, {
+		error: "Priority must be low, medium, or high",
+	}),
+	dueDate: optionalDate("Due date"),
+	assigneeId: optionalUuid("Assignee"),
+});
 
-// Placeholder exports to prevent import errors
-export const projectSchema = "TODO: Implement project validation schema";
-export const taskSchema = "TODO: Implement task validation schema";
-export const userSchema = "TODO: Implement user validation schema";
-export const listSchema = "TODO: Implement list validation schema";
-export const commentSchema = "TODO: Implement comment validation schema";
+export const taskCreateSchema = taskSchema.extend({
+	listId: z.uuid("List must be a valid ID"),
+	position: optionalPosition,
+});
+
+export const taskUpdateSchema = taskCreateSchema
+	.partial()
+	.refine(hasUpdate, { message: "At least one task field is required" });
+
+export const userProfileSchema = z.object({
+	firstName: optionalText("First name", 100),
+	lastName: optionalText("Last name", 100),
+	email: z.email("Enter a valid email address").optional(),
+	imageUrl: z.url("Image URL must be valid").optional(),
+});
+
+export const userSchema = userProfileSchema;
+
+export const listSchema = z.object({
+	name: requiredText("List name", 100),
+	position: optionalPosition,
+});
+
+export const listCreateSchema = listSchema.extend({
+	projectId: z.uuid("Project must be a valid ID"),
+});
+
+export const listUpdateSchema = listSchema
+	.partial()
+	.refine(hasUpdate, { message: "At least one list field is required" });
+
+export const commentSchema = z.object({
+	content: requiredText("Comment", 1000),
+});
+
+export const commentCreateSchema = commentSchema.extend({
+	taskId: z.uuid("Task must be a valid ID"),
+});
+
+export const commentUpdateSchema = commentSchema.partial().refine(hasUpdate, {
+	message: "Comment content is required",
+});
+
+export type ProjectInput = z.input<typeof projectSchema>;
+export type ProjectData = z.output<typeof projectSchema>;
+export type TaskInput = z.input<typeof taskSchema>;
+export type TaskData = z.output<typeof taskSchema>;
+export type UserProfileInput = z.input<typeof userProfileSchema>;
+export type ListInput = z.input<typeof listSchema>;
+export type CommentInput = z.input<typeof commentSchema>;

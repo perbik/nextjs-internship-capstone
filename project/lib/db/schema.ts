@@ -197,13 +197,25 @@ export const listsRelations = relations(lists, ({ one, many }) => ({
 	tasks: many(tasks),
 }));
 
-export const tasksRelations = relations(tasks, ({ one }) => ({
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
 	list: one(lists, {
 		fields: [tasks.listId],
 		references: [lists.id],
 	}),
 	assignee: one(users, {
 		fields: [tasks.assigneeId],
+		references: [users.id],
+	}),
+	comments: many(comments),
+}));
+
+export const commentsRelations = relations(comments, ({ one }) => ({
+	task: one(tasks, {
+		fields: [comments.taskId],
+		references: [tasks.id],
+	}),
+	author: one(users, {
+		fields: [comments.authorId],
 		references: [users.id],
 	}),
 }));
@@ -218,3 +230,5 @@ export type List = typeof lists.$inferSelect;
 export type NewList = typeof lists.$inferInsert;
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
+export type Comment = typeof comments.$inferSelect;
+export type NewComment = typeof comments.$inferInsert;

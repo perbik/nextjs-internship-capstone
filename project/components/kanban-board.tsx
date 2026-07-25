@@ -17,11 +17,25 @@ import {
 	moveListAction,
 	updateListAction,
 } from "@/app/(dashboard)/projects/[id]/list-actions";
+import {
+	CreateTaskModal,
+	type TaskMemberOption,
+} from "@/components/modals/create-task-modal";
+import { TaskCard } from "@/components/task-card";
 
 interface BoardTask {
 	id: string;
+	listId: string;
 	title: string;
+	description: string | null;
 	priority: "low" | "medium" | "high";
+	dueDate: Date | null;
+	assigneeId: string | null;
+	assignee: {
+		firstName: string | null;
+		lastName: string | null;
+		email: string;
+	} | null;
 }
 
 interface BoardList {
@@ -35,12 +49,18 @@ interface BoardList {
 interface KanbanBoardProps {
 	projectId: string;
 	lists: BoardList[];
+	members: TaskMemberOption[];
 	canManage: boolean;
 }
 
 const initialState: ListActionState = { message: "" };
 
-export function KanbanBoard({ projectId, lists, canManage }: KanbanBoardProps) {
+export function KanbanBoard({
+	projectId,
+	lists,
+	members,
+	canManage,
+}: KanbanBoardProps) {
 	const [createState, createAction, isCreating] = useActionState(
 		createListAction,
 		initialState,
@@ -54,6 +74,8 @@ export function KanbanBoard({ projectId, lists, canManage }: KanbanBoardProps) {
 						key={list.id}
 						projectId={projectId}
 						list={list}
+						lists={lists}
+						members={members}
 						canManage={canManage}
 						canMoveLeft={index > 0}
 						canMoveRight={index < lists.length - 1}
@@ -118,12 +140,16 @@ export function KanbanBoard({ projectId, lists, canManage }: KanbanBoardProps) {
 function ListColumn({
 	projectId,
 	list,
+	lists,
+	members,
 	canManage,
 	canMoveLeft,
 	canMoveRight,
 }: {
 	projectId: string;
 	list: BoardList;
+	lists: BoardList[];
+	members: TaskMemberOption[];
 	canManage: boolean;
 	canMoveLeft: boolean;
 	canMoveRight: boolean;
@@ -246,23 +272,25 @@ function ListColumn({
 			<div className="min-h-80 space-y-3 p-3">
 				{list.tasks.length > 0 ? (
 					list.tasks.map((task) => (
-						<article
+						<TaskCard
 							key={task.id}
-							className="rounded-lg border border-french_gray-300 bg-white p-3 dark:border-paynes_gray-400 dark:bg-outer_space-300"
-						>
-							<h3 className="text-sm font-medium text-outer_space-500 dark:text-platinum-500">
-								{task.title}
-							</h3>
-							<p className="mt-2 text-xs capitalize text-paynes_gray-500 dark:text-french_gray-400">
-								{task.priority} priority
-							</p>
-						</article>
+							projectId={projectId}
+							task={task}
+							lists={lists}
+							members={members}
+						/>
 					))
 				) : (
 					<p className="py-8 text-center text-sm text-paynes_gray-500 dark:text-french_gray-400">
 						No tasks in this column
 					</p>
 				)}
+				<CreateTaskModal
+					projectId={projectId}
+					lists={lists}
+					members={members}
+					initialListId={list.id}
+				/>
 			</div>
 		</section>
 	);

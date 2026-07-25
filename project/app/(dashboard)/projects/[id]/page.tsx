@@ -61,6 +61,12 @@ export default async function ProjectPage({
 			<KanbanBoard
 				projectId={project.id}
 				lists={project.lists}
+				members={project.members.map(({ user: member }) => ({
+					id: member.id,
+					name:
+						[member.firstName, member.lastName].filter(Boolean).join(" ") ||
+						member.email,
+				}))}
 				canManage={canManage}
 			/>
 		</div>

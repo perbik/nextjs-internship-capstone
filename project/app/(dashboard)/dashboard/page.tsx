@@ -9,6 +9,21 @@ import { CreateProjectModal } from "@/components/modals/create-project-modal";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { getDashboardData } from "@/lib/db/queries";
 
+const projectStatusLabels = {
+	active: "Active",
+	completed: "Completed",
+	on_hold: "On hold",
+} as const;
+
+const projectStatusClasses = {
+	active:
+		"bg-blue_munsell-100 text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300",
+	completed:
+		"bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+	on_hold:
+		"bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+} as const;
+
 export default async function DashboardPage() {
 	const user = await requireCurrentUser();
 	const { stats, recentProjects } = await getDashboardData(user.id);
@@ -92,18 +107,38 @@ export default async function DashboardPage() {
 										<Link
 											key={project.id}
 											href={`/projects/${project.id}`}
-											className="block rounded-lg bg-platinum-800 p-4 transition-colors hover:bg-platinum-600 dark:bg-outer_space-400 dark:hover:bg-paynes_gray-400"
+											className="group block rounded-lg border border-transparent bg-platinum-800 p-4 transition-colors hover:border-blue_munsell-500 hover:bg-platinum-600 dark:bg-outer_space-400 dark:hover:bg-paynes_gray-400"
 										>
-											<div className="flex items-center justify-between gap-4">
+											<div className="flex items-start justify-between gap-4">
 												<div className="min-w-0">
-													<p className="truncate font-medium text-outer_space-500 dark:text-platinum-500">
+													<p className="truncate font-medium text-outer_space-500 group-hover:text-blue_munsell-600 dark:text-platinum-500">
 														{project.name}
 													</p>
 													<p className="mt-1 text-xs text-paynes_gray-500 dark:text-french_gray-400">
 														Updated {project.updatedAt.toLocaleDateString()}
 													</p>
 												</div>
-												<span className="shrink-0 text-sm font-medium text-blue_munsell-600 dark:text-blue_munsell-400">
+												<span
+													className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${projectStatusClasses[project.status]}`}
+												>
+													{projectStatusLabels[project.status]}
+												</span>
+											</div>
+											<div className="mt-3 flex items-center gap-3">
+												<div
+													className="h-1.5 flex-1 overflow-hidden rounded-full bg-french_gray-300 dark:bg-paynes_gray-500"
+													role="progressbar"
+													aria-label={`${project.name} progress`}
+													aria-valuenow={progress}
+													aria-valuemin={0}
+													aria-valuemax={100}
+												>
+													<div
+														className="h-full rounded-full bg-blue_munsell-500"
+														style={{ width: `${progress}%` }}
+													/>
+												</div>
+												<span className="w-9 text-right text-xs font-medium text-blue_munsell-600 dark:text-blue_munsell-400">
 													{progress}%
 												</span>
 											</div>

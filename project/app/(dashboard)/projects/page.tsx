@@ -10,18 +10,20 @@ export default async function ProjectsPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-				<div>
-					<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
-						Projects
-					</h1>
-					<p className="mt-2 text-paynes_gray-500 dark:text-french_gray-500">
-						{projects.length === 0
-							? "Create your first project to start organizing work."
-							: `${projects.length} ${projects.length === 1 ? "project" : "projects"} available to you.`}
-					</p>
+			<div className="rounded-xl border border-french_gray-300 bg-white p-5 sm:p-6 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+				<div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+					<div>
+						<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
+							Projects
+						</h1>
+						<p className="mt-2 text-paynes_gray-500 dark:text-french_gray-500">
+							{projects.length === 0
+								? "Create your first project to start organizing work."
+								: `${projects.length} ${projects.length === 1 ? "project" : "projects"} available to you.`}
+						</p>
+					</div>
+					<CreateProjectModal />
 				</div>
-				<CreateProjectModal />
 			</div>
 
 			{projects.length > 0 ? (

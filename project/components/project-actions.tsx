@@ -1,7 +1,7 @@
 "use client";
 
 import { Pencil, Trash2, X } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useId, useState } from "react";
 import {
 	deleteProjectAction,
 	type ProjectActionState,
@@ -19,6 +19,7 @@ interface ProjectActionsProps {
 	};
 	canManage: boolean;
 	canDelete: boolean;
+	variant?: "default" | "compact";
 }
 
 const initialState: ProjectActionState = { message: "" };
@@ -27,12 +28,20 @@ export function ProjectActions({
 	project,
 	canManage,
 	canDelete,
+	variant = "default",
 }: ProjectActionsProps) {
 	const [isOpen, setIsOpen] = useState(false);
+	const formId = useId();
 	const [state, formAction, isPending] = useActionState(
 		updateProjectAction,
 		initialState,
 	);
+
+	useEffect(() => {
+		if (state.success) {
+			setIsOpen(false);
+		}
+	}, [state]);
 
 	if (!canManage && !canDelete) {
 		return null;
@@ -45,10 +54,15 @@ export function ProjectActions({
 					<button
 						type="button"
 						onClick={() => setIsOpen(true)}
-						className="inline-flex items-center rounded-lg border border-french_gray-300 px-3 py-2 text-sm text-outer_space-500 hover:bg-platinum-500 dark:border-paynes_gray-400 dark:text-platinum-500 dark:hover:bg-paynes_gray-400"
+						aria-label={`Edit ${project.name}`}
+						className={
+							variant === "compact"
+								? "rounded-md border border-french_gray-300 p-2 text-paynes_gray-500 transition-colors hover:border-blue_munsell-500 hover:text-blue_munsell-500 dark:border-paynes_gray-400 dark:text-french_gray-400"
+								: "inline-flex items-center rounded-lg border border-french_gray-300 px-3 py-2 text-sm text-outer_space-500 hover:bg-platinum-500 dark:border-paynes_gray-400 dark:text-platinum-500 dark:hover:bg-paynes_gray-400"
+						}
 					>
-						<Pencil size={16} className="mr-2" />
-						Edit
+						<Pencil size={16} className={variant === "default" ? "mr-2" : ""} />
+						{variant === "default" && "Edit"}
 					</button>
 				)}
 
@@ -68,10 +82,18 @@ export function ProjectActions({
 						<input type="hidden" name="projectId" value={project.id} />
 						<button
 							type="submit"
-							className="inline-flex items-center rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
+							aria-label={`Delete ${project.name}`}
+							className={
+								variant === "compact"
+									? "rounded-md border border-red-200 p-2 text-red-500 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30"
+									: "inline-flex items-center rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
+							}
 						>
-							<Trash2 size={16} className="mr-2" />
-							Delete
+							<Trash2
+								size={16}
+								className={variant === "default" ? "mr-2" : ""}
+							/>
+							{variant === "default" && "Delete"}
 						</button>
 					</form>
 				)}
@@ -97,6 +119,7 @@ export function ProjectActions({
 						<form action={formAction} className="space-y-4">
 							<input type="hidden" name="projectId" value={project.id} />
 							<EditField
+								idPrefix={formId}
 								label="Name"
 								name="name"
 								defaultValue={project.name}
@@ -106,13 +129,13 @@ export function ProjectActions({
 
 							<div>
 								<label
-									htmlFor="edit-description"
+									htmlFor={`${formId}-edit-description`}
 									className="mb-1 block text-sm font-medium"
 								>
 									Description
 								</label>
 								<textarea
-									id="edit-description"
+									id={`${formId}-edit-description`}
 									name="description"
 									defaultValue={project.description ?? ""}
 									rows={4}
@@ -123,13 +146,13 @@ export function ProjectActions({
 
 							<div>
 								<label
-									htmlFor="edit-status"
+									htmlFor={`${formId}-edit-status`}
 									className="mb-1 block text-sm font-medium"
 								>
 									Status
 								</label>
 								<select
-									id="edit-status"
+									id={`${formId}-edit-status`}
 									name="status"
 									defaultValue={project.status}
 									className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 dark:border-paynes_gray-400 dark:bg-outer_space-400"
@@ -142,6 +165,7 @@ export function ProjectActions({
 							</div>
 
 							<EditField
+								idPrefix={formId}
 								label="Due date"
 								name="dueDate"
 								type="date"
@@ -149,14 +173,10 @@ export function ProjectActions({
 								error={state.errors?.dueDate?.[0]}
 							/>
 
-							{state.message && (
+							{state.message && !state.success && (
 								<p
-									className={
-										state.errors
-											? "text-sm text-red-600"
-											: "text-sm text-green-600"
-									}
-									role="status"
+									className="text-sm text-red-600 dark:text-red-400"
+									role="alert"
 								>
 									{state.message}
 								</p>
@@ -187,6 +207,7 @@ export function ProjectActions({
 }
 
 function EditField({
+	idPrefix,
 	label,
 	name,
 	type = "text",
@@ -194,6 +215,7 @@ function EditField({
 	required = false,
 	error,
 }: {
+	idPrefix: string;
 	label: string;
 	name: string;
 	type?: string;
@@ -201,7 +223,7 @@ function EditField({
 	required?: boolean;
 	error?: string;
 }) {
-	const id = `edit-${name}`;
+	const id = `${idPrefix}-edit-${name}`;
 
 	return (
 		<div>

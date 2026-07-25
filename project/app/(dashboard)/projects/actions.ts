@@ -12,6 +12,7 @@ import { projectCreateSchema, projectUpdateSchema } from "@/lib/validations";
 
 export interface ProjectActionState {
 	message: string;
+	success?: boolean;
 	errors?: Record<string, string[]>;
 }
 
@@ -109,7 +110,7 @@ export async function updateProjectAction(
 	revalidatePath("/projects");
 	revalidatePath(`/projects/${projectId}`);
 
-	return { message: "Project updated successfully" };
+	return { message: "Project updated successfully", success: true };
 }
 
 export async function deleteProjectAction(formData: FormData) {

@@ -1,6 +1,12 @@
 "use client";
 
 import {
+	DragDropProvider,
+	type DragEndEvent,
+	useDroppable,
+} from "@dnd-kit/react";
+import { isSortable } from "@dnd-kit/react/sortable";
+import {
 	ArrowLeft,
 	ArrowRight,
 	CheckCircle,
@@ -8,7 +14,13 @@ import {
 	Plus,
 	Trash2,
 } from "lucide-react";
-import { useActionState } from "react";
+import {
+	useActionState,
+	useEffect,
+	useRef,
+	useState,
+	useTransition,
+} from "react";
 import { useFormStatus } from "react-dom";
 import {
 	createListAction,
@@ -17,11 +29,12 @@ import {
 	moveListAction,
 	updateListAction,
 } from "@/app/(dashboard)/projects/[id]/list-actions";
+import { moveTaskAction } from "@/app/(dashboard)/projects/[id]/task-actions";
 import {
 	CreateTaskModal,
 	type TaskMemberOption,
 } from "@/components/modals/create-task-modal";
-import { TaskCard } from "@/components/task-card";
+import { TaskCard, type TaskDragData } from "@/components/task-card";
 
 interface BoardTask {
 	id: string;
@@ -51,6 +64,13 @@ interface KanbanBoardProps {
 	lists: BoardList[];
 	members: TaskMemberOption[];
 	canManage: boolean;
+	dragEnabled: boolean;
+}
+
+interface ColumnDropData {
+	kind: "column";
+	listId: string;
+	index: number;
 }
 
 const initialState: ListActionState = { message: "" };
@@ -60,81 +80,215 @@ export function KanbanBoard({
 	lists,
 	members,
 	canManage,
+	dragEnabled,
 }: KanbanBoardProps) {
 	const [createState, createAction, isCreating] = useActionState(
 		createListAction,
 		initialState,
 	);
+	const [boardLists, setBoardLists] = useState(lists);
+	const [moveError, setMoveError] = useState("");
+	const [isMoving, startMoveTransition] = useTransition();
+	const isDragging = useRef(false);
+
+	useEffect(() => {
+		if (!isDragging.current) {
+			setBoardLists(lists);
+		}
+	}, [lists]);
+
+	function handleDragEnd(event: DragEndEvent) {
+		isDragging.current = false;
+
+		if (event.canceled || !dragEnabled) {
+			return;
+		}
+
+		const source = event.operation.source;
+
+		if (!isSortable(source)) {
+			return;
+		}
+
+		const task = source.data as TaskDragData;
+		if (task.kind !== "task") {
+			return;
+		}
+
+		const dropTarget = event.operation.target?.data as
+			| TaskDragData
+			| ColumnDropData
+			| undefined;
+		const droppedOnColumn = dropTarget?.kind === "column";
+		const targetListId = droppedOnColumn
+			? dropTarget.listId
+			: typeof source.group === "string"
+				? source.group
+				: task.listId;
+		const targetPosition = droppedOnColumn ? dropTarget.index : source.index;
+		const initialListId =
+			typeof source.initialGroup === "string"
+				? source.initialGroup
+				: task.listId;
+		const initialPosition = source.initialIndex;
+
+		if (initialListId === targetListId && initialPosition === targetPosition) {
+			return;
+		}
+
+		setBoardLists((currentLists) =>
+			moveBoardTask(
+				currentLists,
+				task.taskId,
+				initialListId,
+				targetListId,
+				targetPosition,
+			),
+		);
+		setMoveError("");
+		startMoveTransition(async () => {
+			const result = await moveTaskAction({
+				projectId,
+				taskId: task.taskId,
+				targetListId,
+				targetPosition,
+			});
+
+			if (!result.success) {
+				setBoardLists(lists);
+				setMoveError(result.message);
+			}
+		});
+	}
 
 	return (
-		<div className="overflow-hidden rounded-lg border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
-			<div className="flex gap-5 overflow-x-auto pb-3">
-				{lists.map((list, index) => (
-					<ListColumn
-						key={list.id}
-						projectId={projectId}
-						list={list}
-						lists={lists}
-						members={members}
-						canManage={canManage}
-						canMoveLeft={index > 0}
-						canMoveRight={index < lists.length - 1}
-					/>
-				))}
-
-				{canManage && (
-					<form
-						action={createAction}
-						className="w-80 shrink-0 self-start rounded-lg border border-dashed border-french_gray-300 bg-platinum-800 p-4 dark:border-paynes_gray-400 dark:bg-outer_space-400"
-					>
-						<input type="hidden" name="projectId" value={projectId} />
-						<label
-							htmlFor="new-list-name"
-							className="text-sm font-medium text-outer_space-500 dark:text-platinum-500"
-						>
-							Add a column
-						</label>
-						<input
-							id="new-list-name"
-							name="name"
-							required
-							maxLength={100}
-							placeholder="Column name"
-							className="mt-2 w-full rounded-md border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-500 dark:text-platinum-500"
-						/>
-						<label className="mt-3 flex items-center gap-2 text-sm text-paynes_gray-500 dark:text-french_gray-400">
-							<input
-								type="checkbox"
-								name="isCompleted"
-								className="size-4 accent-blue_munsell-500"
-							/>
-							Tasks here count as completed
-						</label>
-						{createState.message && (
-							<p
-								className={`mt-2 text-xs ${
-									createState.success
-										? "text-green-600 dark:text-green-400"
-										: "text-red-600 dark:text-red-400"
-								}`}
-								role="status"
-							>
-								{createState.message}
-							</p>
-						)}
-						<button
-							type="submit"
-							disabled={isCreating}
-							className="mt-3 inline-flex items-center gap-2 rounded-md bg-blue_munsell-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue_munsell-600 disabled:opacity-60"
-						>
-							<Plus size={16} />
-							{isCreating ? "Adding..." : "Add column"}
-						</button>
-					</form>
+		<DragDropProvider
+			onDragStart={() => {
+				isDragging.current = true;
+			}}
+			onDragEnd={handleDragEnd}
+		>
+			<div className="overflow-hidden rounded-lg border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+				{!dragEnabled && (
+					<p className="mb-4 rounded-lg bg-yellow-50 px-3 py-2 text-sm text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200">
+						Clear task filters to drag and reorder tasks.
+					</p>
 				)}
+				{isMoving && (
+					<p className="mb-4 text-sm text-blue_munsell-600 dark:text-blue_munsell-400">
+						Saving task position...
+					</p>
+				)}
+				{moveError && (
+					<p
+						className="mb-4 text-sm text-red-600 dark:text-red-400"
+						role="alert"
+					>
+						{moveError}
+					</p>
+				)}
+				<div className="flex gap-5 overflow-x-auto pb-3">
+					{boardLists.map((list, index) => (
+						<ListColumn
+							key={list.id}
+							projectId={projectId}
+							list={list}
+							lists={boardLists}
+							members={members}
+							dragDisabled={!dragEnabled}
+							canManage={canManage}
+							canMoveLeft={index > 0}
+							canMoveRight={index < lists.length - 1}
+						/>
+					))}
+
+					{canManage && (
+						<form
+							action={createAction}
+							className="w-80 shrink-0 self-start rounded-lg border border-dashed border-french_gray-300 bg-platinum-800 p-4 dark:border-paynes_gray-400 dark:bg-outer_space-400"
+						>
+							<input type="hidden" name="projectId" value={projectId} />
+							<label
+								htmlFor="new-list-name"
+								className="text-sm font-medium text-outer_space-500 dark:text-platinum-500"
+							>
+								Add a column
+							</label>
+							<input
+								id="new-list-name"
+								name="name"
+								required
+								maxLength={100}
+								placeholder="Column name"
+								className="mt-2 w-full rounded-md border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-500 dark:text-platinum-500"
+							/>
+							<label className="mt-3 flex items-center gap-2 text-sm text-paynes_gray-500 dark:text-french_gray-400">
+								<input
+									type="checkbox"
+									name="isCompleted"
+									className="size-4 accent-blue_munsell-500"
+								/>
+								Tasks here count as completed
+							</label>
+							{createState.message && (
+								<p
+									className={`mt-2 text-xs ${
+										createState.success
+											? "text-green-600 dark:text-green-400"
+											: "text-red-600 dark:text-red-400"
+									}`}
+									role="status"
+								>
+									{createState.message}
+								</p>
+							)}
+							<button
+								type="submit"
+								disabled={isCreating}
+								className="mt-3 inline-flex items-center gap-2 rounded-md bg-blue_munsell-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue_munsell-600 disabled:opacity-60"
+							>
+								<Plus size={16} />
+								{isCreating ? "Adding..." : "Add column"}
+							</button>
+						</form>
+					)}
+				</div>
 			</div>
-		</div>
+		</DragDropProvider>
 	);
+}
+
+function moveBoardTask(
+	currentLists: BoardList[],
+	taskId: string,
+	sourceListId: string,
+	targetListId: string,
+	targetPosition: number,
+) {
+	const sourceList = currentLists.find((list) => list.id === sourceListId);
+	const task = sourceList?.tasks.find((item) => item.id === taskId);
+
+	if (!task) {
+		return currentLists;
+	}
+
+	return currentLists.map((list) => {
+		const tasksWithoutMovedTask = list.tasks.filter(
+			(item) => item.id !== taskId,
+		);
+
+		if (list.id !== targetListId) {
+			return list.id === sourceListId
+				? { ...list, tasks: tasksWithoutMovedTask }
+				: list;
+		}
+
+		const nextTasks = [...tasksWithoutMovedTask];
+		const nextPosition = Math.min(targetPosition, nextTasks.length);
+		nextTasks.splice(nextPosition, 0, { ...task, listId: targetListId });
+
+		return { ...list, tasks: nextTasks };
+	});
 }
 
 function ListColumn({
@@ -142,6 +296,7 @@ function ListColumn({
 	list,
 	lists,
 	members,
+	dragDisabled,
 	canManage,
 	canMoveLeft,
 	canMoveRight,
@@ -150,6 +305,7 @@ function ListColumn({
 	list: BoardList;
 	lists: BoardList[];
 	members: TaskMemberOption[];
+	dragDisabled: boolean;
 	canManage: boolean;
 	canMoveLeft: boolean;
 	canMoveRight: boolean;
@@ -162,6 +318,16 @@ function ListColumn({
 		deleteListAction,
 		initialState,
 	);
+	const { ref: dropRef, isDropTarget } = useDroppable<ColumnDropData>({
+		id: `column-${list.id}`,
+		type: "column",
+		accept: "task",
+		data: {
+			kind: "column",
+			listId: list.id,
+			index: list.tasks.length,
+		},
+	});
 
 	return (
 		<section className="w-80 shrink-0 overflow-hidden rounded-lg border border-french_gray-300 bg-platinum-800 dark:border-paynes_gray-400 dark:bg-outer_space-400">
@@ -269,12 +435,19 @@ function ListColumn({
 				</div>
 			</header>
 
-			<div className="min-h-80 space-y-3 p-3">
+			<div
+				ref={dropRef}
+				className={`min-h-80 space-y-3 p-3 transition-colors ${
+					isDropTarget ? "bg-blue_munsell-50 dark:bg-blue_munsell-900/20" : ""
+				}`}
+			>
 				{list.tasks.length > 0 ? (
-					list.tasks.map((task) => (
+					list.tasks.map((task, index) => (
 						<TaskCard
 							key={task.id}
 							projectId={projectId}
+							index={index}
+							dragDisabled={dragDisabled}
 							task={task}
 							lists={lists}
 							members={members}

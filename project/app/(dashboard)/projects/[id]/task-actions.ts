@@ -3,8 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { createTask, updateTask } from "@/lib/db/mutations";
-import { taskCreateSchema, taskUpdateSchema } from "@/lib/validations";
+import { createTask, moveTask, updateTask } from "@/lib/db/mutations";
+import {
+	taskCreateSchema,
+	taskMoveSchema,
+	taskUpdateSchema,
+} from "@/lib/validations";
 
 export interface TaskActionState {
 	message: string;
@@ -129,4 +133,32 @@ export async function updateTaskAction(
 	revalidatePath("/projects");
 	revalidatePath("/dashboard");
 	return { message: "Task updated", success: true };
+}
+
+export async function moveTaskAction(input: unknown): Promise<TaskActionState> {
+	const parsed = taskMoveSchema.safeParse(input);
+
+	if (!parsed.success) {
+		return { message: "Invalid task movement" };
+	}
+
+	try {
+		const user = await requireCurrentUser();
+		await moveTask(
+			parsed.data.taskId,
+			parsed.data.targetListId,
+			parsed.data.targetPosition,
+			user.id,
+		);
+	} catch (error) {
+		return {
+			message:
+				error instanceof Error ? error.message : "Unable to move the task",
+		};
+	}
+
+	revalidatePath("/dashboard");
+	revalidatePath("/projects");
+	revalidatePath(`/projects/${parsed.data.projectId}`);
+	return { message: "Task moved", success: true };
 }

@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { canAccessProject } from "@/lib/db/queries/project-members";
 import { lists, projectMembers, projects, tasks } from "@/lib/db/schema";
@@ -154,4 +154,79 @@ export async function updateTask(
 
 	await touchProject(currentTask.projectId);
 	return task;
+}
+
+export async function moveTask(
+	taskId: string,
+	targetListId: string,
+	targetPosition: number,
+	userId: string,
+) {
+	const [currentTask] = await db
+		.select({ task: tasks, projectId: lists.projectId })
+		.from(tasks)
+		.innerJoin(lists, eq(tasks.listId, lists.id))
+		.where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt)))
+		.limit(1);
+
+	if (
+		!currentTask ||
+		!(await canAccessProject(currentTask.projectId, userId))
+	) {
+		throw new Error("You do not have permission to move this task");
+	}
+
+	const targetList = await getAccessibleList(targetListId, userId);
+
+	if (targetList.projectId !== currentTask.projectId) {
+		throw new Error("A task cannot be moved to a different project");
+	}
+
+	const sourceTasks = await db
+		.select({ id: tasks.id })
+		.from(tasks)
+		.where(
+			and(eq(tasks.listId, currentTask.task.listId), isNull(tasks.deletedAt)),
+		)
+		.orderBy(asc(tasks.position));
+	const sourceIds = sourceTasks
+		.map(({ id }) => id)
+		.filter((id) => id !== taskId);
+
+	if (targetListId === currentTask.task.listId) {
+		const nextPosition = Math.min(targetPosition, sourceIds.length);
+		sourceIds.splice(nextPosition, 0, taskId);
+		await persistTaskOrder(sourceIds, targetListId);
+	} else {
+		const targetTasks = await db
+			.select({ id: tasks.id })
+			.from(tasks)
+			.where(and(eq(tasks.listId, targetListId), isNull(tasks.deletedAt)))
+			.orderBy(asc(tasks.position));
+		const targetIds = targetTasks
+			.map(({ id }) => id)
+			.filter((id) => id !== taskId);
+		const nextPosition = Math.min(targetPosition, targetIds.length);
+
+		targetIds.splice(nextPosition, 0, taskId);
+		await Promise.all([
+			persistTaskOrder(sourceIds, currentTask.task.listId),
+			persistTaskOrder(targetIds, targetListId),
+		]);
+	}
+
+	await touchProject(currentTask.projectId);
+}
+
+async function persistTaskOrder(taskIds: string[], listId: string) {
+	const now = new Date();
+
+	await Promise.all(
+		taskIds.map((id, position) =>
+			db
+				.update(tasks)
+				.set({ listId, position, updatedAt: now })
+				.where(and(eq(tasks.id, id), isNull(tasks.deletedAt))),
+		),
+	);
 }

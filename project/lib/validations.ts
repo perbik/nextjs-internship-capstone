@@ -88,6 +88,16 @@ export const taskUpdateSchema = taskCreateSchema
 	.partial()
 	.refine(hasUpdate, { message: "At least one task field is required" });
 
+export const taskMoveSchema = z.object({
+	projectId: z.uuid("Project must be a valid ID"),
+	taskId: z.uuid("Task must be a valid ID"),
+	targetListId: z.uuid("Target list must be a valid ID"),
+	targetPosition: z
+		.number()
+		.int("Target position must be a whole number")
+		.nonnegative("Target position cannot be negative"),
+});
+
 export const projectFilterSchema = z.object({
 	q: optionalText("Search", 100),
 	status: z.preprocess(

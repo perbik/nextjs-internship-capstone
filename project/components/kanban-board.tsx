@@ -1,53 +1,327 @@
-// TODO: Task 5.1 - Design responsive Kanban board layout
-// TODO: Task 5.2 - Implement drag-and-drop functionality with dnd-kit
+"use client";
 
-/*
-TODO: Implementation Notes for Interns:
+import {
+	ArrowLeft,
+	ArrowRight,
+	CheckCircle,
+	MoreHorizontal,
+	Plus,
+	Trash2,
+} from "lucide-react";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
+import {
+	createListAction,
+	deleteListAction,
+	type ListActionState,
+	moveListAction,
+	updateListAction,
+} from "@/app/(dashboard)/projects/[id]/list-actions";
 
-This is the main Kanban board component that should:
-- Display columns (lists) horizontally
-- Allow drag and drop of tasks between columns
-- Support adding new tasks and columns
-- Handle real-time updates
-- Be responsive on mobile
+interface BoardTask {
+	id: string;
+	title: string;
+	priority: "low" | "medium" | "high";
+}
 
-Key dependencies to install:
-- @dnd-kit/core
-- @dnd-kit/sortable
-- @dnd-kit/utilities
+interface BoardList {
+	id: string;
+	name: string;
+	position: number;
+	isCompleted: boolean;
+	tasks: BoardTask[];
+}
 
-Features to implement:
-- Drag and drop tasks between columns
-- Drag and drop to reorder tasks within columns
-- Add new task button in each column
-- Add new column functionality
-- Optimistic updates (Task 5.4)
-- Real-time persistence (Task 5.5)
-- Mobile responsive design
-- Loading states
-- Error handling
+interface KanbanBoardProps {
+	projectId: string;
+	lists: BoardList[];
+	canManage: boolean;
+}
 
-State management:
-- Use Zustand store for board state (Task 5.3)
-- Implement optimistic updates
-- Handle conflicts with server state
-*/
+const initialState: ListActionState = { message: "" };
 
-export function KanbanBoard({ projectId }: { projectId: string }) {
+export function KanbanBoard({ projectId, lists, canManage }: KanbanBoardProps) {
+	const [createState, createAction, isCreating] = useActionState(
+		createListAction,
+		initialState,
+	);
+
 	return (
-		<div className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6">
-			<div className="text-center text-paynes_gray-500 dark:text-french_gray-400">
-				<h3 className="text-lg font-semibold mb-2">
-					TODO: Implement Kanban Board
-				</h3>
-				<p className="text-sm mb-4">Project ID: {projectId}</p>
-				<div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded border border-yellow-200 dark:border-yellow-800">
-					<p className="text-sm text-yellow-800 dark:text-yellow-200">
-						📋 This will be the main interactive Kanban board with drag-and-drop
-						functionality
-					</p>
-				</div>
+		<div className="overflow-hidden rounded-lg border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+			<div className="flex gap-5 overflow-x-auto pb-3">
+				{lists.map((list, index) => (
+					<ListColumn
+						key={list.id}
+						projectId={projectId}
+						list={list}
+						canManage={canManage}
+						canMoveLeft={index > 0}
+						canMoveRight={index < lists.length - 1}
+					/>
+				))}
+
+				{canManage && (
+					<form
+						action={createAction}
+						className="w-80 shrink-0 self-start rounded-lg border border-dashed border-french_gray-300 bg-platinum-800 p-4 dark:border-paynes_gray-400 dark:bg-outer_space-400"
+					>
+						<input type="hidden" name="projectId" value={projectId} />
+						<label
+							htmlFor="new-list-name"
+							className="text-sm font-medium text-outer_space-500 dark:text-platinum-500"
+						>
+							Add a column
+						</label>
+						<input
+							id="new-list-name"
+							name="name"
+							required
+							maxLength={100}
+							placeholder="Column name"
+							className="mt-2 w-full rounded-md border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-500 dark:text-platinum-500"
+						/>
+						<label className="mt-3 flex items-center gap-2 text-sm text-paynes_gray-500 dark:text-french_gray-400">
+							<input
+								type="checkbox"
+								name="isCompleted"
+								className="size-4 accent-blue_munsell-500"
+							/>
+							Tasks here count as completed
+						</label>
+						{createState.message && (
+							<p
+								className={`mt-2 text-xs ${
+									createState.success
+										? "text-green-600 dark:text-green-400"
+										: "text-red-600 dark:text-red-400"
+								}`}
+								role="status"
+							>
+								{createState.message}
+							</p>
+						)}
+						<button
+							type="submit"
+							disabled={isCreating}
+							className="mt-3 inline-flex items-center gap-2 rounded-md bg-blue_munsell-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue_munsell-600 disabled:opacity-60"
+						>
+							<Plus size={16} />
+							{isCreating ? "Adding..." : "Add column"}
+						</button>
+					</form>
+				)}
 			</div>
 		</div>
+	);
+}
+
+function ListColumn({
+	projectId,
+	list,
+	canManage,
+	canMoveLeft,
+	canMoveRight,
+}: {
+	projectId: string;
+	list: BoardList;
+	canManage: boolean;
+	canMoveLeft: boolean;
+	canMoveRight: boolean;
+}) {
+	const [updateState, updateAction, isUpdating] = useActionState(
+		updateListAction,
+		initialState,
+	);
+	const [deleteState, deleteAction, isDeleting] = useActionState(
+		deleteListAction,
+		initialState,
+	);
+
+	return (
+		<section className="w-80 shrink-0 overflow-hidden rounded-lg border border-french_gray-300 bg-platinum-800 dark:border-paynes_gray-400 dark:bg-outer_space-400">
+			<header className="border-b border-french_gray-300 p-4 dark:border-paynes_gray-400">
+				<div className="flex items-center justify-between gap-2">
+					<div className="min-w-0">
+						<h2 className="flex items-center gap-2 truncate font-semibold text-outer_space-500 dark:text-platinum-500">
+							{list.name}
+							{list.isCompleted && (
+								<CheckCircle
+									size={15}
+									className="shrink-0 text-green-600 dark:text-green-400"
+									aria-label="Completed column"
+								/>
+							)}
+						</h2>
+						<p className="mt-1 text-xs text-paynes_gray-500 dark:text-french_gray-400">
+							{list.tasks.length} {list.tasks.length === 1 ? "task" : "tasks"}
+						</p>
+					</div>
+
+					{canManage && (
+						<details>
+							<summary className="flex cursor-pointer list-none rounded p-1.5 text-paynes_gray-500 hover:bg-french_gray-300 dark:text-french_gray-400 dark:hover:bg-paynes_gray-400">
+								<MoreHorizontal size={18} />
+								<span className="sr-only">Manage {list.name}</span>
+							</summary>
+							<div className="mt-2 w-64 rounded-lg border border-french_gray-300 bg-white p-4 shadow-xl dark:border-paynes_gray-400 dark:bg-outer_space-500">
+								<form action={updateAction} className="space-y-3">
+									<input type="hidden" name="listId" value={list.id} />
+									<input type="hidden" name="projectId" value={projectId} />
+									<label className="block text-xs font-medium text-outer_space-500 dark:text-platinum-500">
+										Column name
+										<input
+											name="name"
+											required
+											maxLength={100}
+											defaultValue={list.name}
+											className="mt-1 w-full rounded-md border border-french_gray-300 bg-white px-2.5 py-2 text-sm dark:border-paynes_gray-400 dark:bg-outer_space-400"
+										/>
+									</label>
+									<label className="flex items-center gap-2 text-xs text-paynes_gray-500 dark:text-french_gray-400">
+										<input
+											type="checkbox"
+											name="isCompleted"
+											defaultChecked={list.isCompleted}
+											className="size-4 accent-blue_munsell-500"
+										/>
+										Tasks here count as completed
+									</label>
+									{updateState.message && <ActionMessage state={updateState} />}
+									<button
+										type="submit"
+										disabled={isUpdating}
+										className="w-full rounded-md bg-blue_munsell-500 px-3 py-2 text-sm text-white disabled:opacity-60"
+									>
+										{isUpdating ? "Saving..." : "Save changes"}
+									</button>
+								</form>
+
+								<div className="my-3 border-t border-french_gray-300 dark:border-paynes_gray-400" />
+
+								<div className="mb-3 grid grid-cols-2 gap-2">
+									<MoveListButton
+										projectId={projectId}
+										listId={list.id}
+										direction="left"
+										disabled={!canMoveLeft}
+									/>
+									<MoveListButton
+										projectId={projectId}
+										listId={list.id}
+										direction="right"
+										disabled={!canMoveRight}
+									/>
+								</div>
+
+								<form
+									action={deleteAction}
+									onSubmit={(event) => {
+										if (
+											!window.confirm(
+												`Delete "${list.name}" and all tasks inside it?`,
+											)
+										) {
+											event.preventDefault();
+										}
+									}}
+								>
+									<input type="hidden" name="listId" value={list.id} />
+									<input type="hidden" name="projectId" value={projectId} />
+									{deleteState.message && <ActionMessage state={deleteState} />}
+									<button
+										type="submit"
+										disabled={isDeleting}
+										className="flex w-full items-center justify-center gap-2 rounded-md border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
+									>
+										<Trash2 size={15} />
+										{isDeleting ? "Deleting..." : "Delete column"}
+									</button>
+								</form>
+							</div>
+						</details>
+					)}
+				</div>
+			</header>
+
+			<div className="min-h-80 space-y-3 p-3">
+				{list.tasks.length > 0 ? (
+					list.tasks.map((task) => (
+						<article
+							key={task.id}
+							className="rounded-lg border border-french_gray-300 bg-white p-3 dark:border-paynes_gray-400 dark:bg-outer_space-300"
+						>
+							<h3 className="text-sm font-medium text-outer_space-500 dark:text-platinum-500">
+								{task.title}
+							</h3>
+							<p className="mt-2 text-xs capitalize text-paynes_gray-500 dark:text-french_gray-400">
+								{task.priority} priority
+							</p>
+						</article>
+					))
+				) : (
+					<p className="py-8 text-center text-sm text-paynes_gray-500 dark:text-french_gray-400">
+						No tasks in this column
+					</p>
+				)}
+			</div>
+		</section>
+	);
+}
+
+function MoveListButton({
+	projectId,
+	listId,
+	direction,
+	disabled,
+}: {
+	projectId: string;
+	listId: string;
+	direction: "left" | "right";
+	disabled: boolean;
+}) {
+	return (
+		<form action={moveListAction}>
+			<input type="hidden" name="projectId" value={projectId} />
+			<input type="hidden" name="listId" value={listId} />
+			<input type="hidden" name="direction" value={direction} />
+			<MoveSubmitButton direction={direction} disabled={disabled} />
+		</form>
+	);
+}
+
+function MoveSubmitButton({
+	direction,
+	disabled,
+}: {
+	direction: "left" | "right";
+	disabled: boolean;
+}) {
+	const { pending } = useFormStatus();
+	const Icon = direction === "left" ? ArrowLeft : ArrowRight;
+
+	return (
+		<button
+			type="submit"
+			disabled={disabled || pending}
+			className="flex w-full items-center justify-center gap-1 rounded-md border border-french_gray-300 px-2 py-1.5 text-xs text-outer_space-500 disabled:cursor-not-allowed disabled:opacity-40 dark:border-paynes_gray-400 dark:text-platinum-500"
+		>
+			<Icon size={14} />
+			{direction === "left" ? "Move left" : "Move right"}
+		</button>
+	);
+}
+
+function ActionMessage({ state }: { state: ListActionState }) {
+	return (
+		<p
+			className={`mb-2 text-xs ${
+				state.success
+					? "text-green-600 dark:text-green-400"
+					: "text-red-600 dark:text-red-400"
+			}`}
+			role="status"
+		>
+			{state.message}
+		</p>
 	);
 }

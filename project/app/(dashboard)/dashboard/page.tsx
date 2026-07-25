@@ -121,11 +121,6 @@ export default function DashboardPage() {
 							</div>
 						))}
 					</div>
-					<div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
-						<p className="text-sm text-yellow-800 dark:text-yellow-200">
-							📋 <strong>Task 4.1:</strong> Implement project CRUD operations
-						</p>
-					</div>
 				</div>
 
 				{/* Quick Actions */}

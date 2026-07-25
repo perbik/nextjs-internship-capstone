@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import {
 	ArrowLeft,
 	Calendar,
@@ -6,8 +7,47 @@ import {
 	Users,
 } from "lucide-react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ProjectActions } from "@/components/project-actions";
+import {
+	getProjectById,
+	getProjectMembership,
+	getUserByClerkId,
+} from "@/lib/db/queries";
 
-export default function ProjectPage({ params }: { params: { id: string } }) {
+export default async function ProjectPage({
+	params,
+}: {
+	params: Promise<{ id: string }>;
+}) {
+	const [{ id: projectId }, { userId: clerkId }] = await Promise.all([
+		params,
+		auth(),
+	]);
+
+	if (!clerkId) {
+		notFound();
+	}
+
+	const user = await getUserByClerkId(clerkId);
+
+	if (!user) {
+		throw new Error("Your ProjectFlow account is not synchronized yet");
+	}
+
+	const [project, membership] = await Promise.all([
+		getProjectById(projectId, user.id),
+		getProjectMembership(projectId, user.id),
+	]);
+
+	if (!project) {
+		notFound();
+	}
+
+	const canManage =
+		membership?.role === "owner" || membership?.role === "admin";
+	const canDelete = project.ownerId === user.id;
+
 	return (
 		<div className="space-y-6">
 			{/* Project Header */}
@@ -21,10 +61,10 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 					</Link>
 					<div>
 						<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
-							Project #{params.id}
+							{project.name}
 						</h1>
 						<p className="text-paynes_gray-500 dark:text-french_gray-500 mt-1">
-							Kanban board view for project management
+							{project.description || "No project description"}
 						</p>
 					</div>
 				</div>
@@ -51,13 +91,17 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 					>
 						<Settings size={20} />
 					</button>
-					<button
-						type="button"
-						aria-label="More project actions"
-						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
-					>
-						<MoreHorizontal size={20} />
-					</button>
+					<ProjectActions
+						project={{
+							id: project.id,
+							name: project.name,
+							description: project.description,
+							status: project.status,
+							dueDate: project.dueDate?.toISOString() ?? null,
+						}}
+						canManage={canManage}
+						canDelete={canDelete}
+					/>
 				</div>
 			</div>
 

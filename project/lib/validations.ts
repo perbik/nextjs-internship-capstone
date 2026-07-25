@@ -60,6 +60,7 @@ export const projectCreateSchema = projectSchema;
 
 export const projectUpdateSchema = projectSchema
 	.extend({
+		dueDate: optionalDate("Due date"),
 		status: z.enum(PROJECT_STATUSES, {
 			error: "Status must be active, completed, or on hold",
 		}),

@@ -1,4 +1,5 @@
-import { Filter, Plus, Search } from "lucide-react";
+import { Filter, Search } from "lucide-react";
+import { CreateProjectModal } from "@/components/modals/create-project-modal";
 
 export default function ProjectsPage() {
 	return (
@@ -12,13 +13,7 @@ export default function ProjectsPage() {
 						Manage and organize your team projects
 					</p>
 				</div>
-				<button
-					type="button"
-					className="inline-flex items-center px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors"
-				>
-					<Plus size={20} className="mr-2" />
-					New Project
-				</button>
+				<CreateProjectModal />
 			</div>
 
 			{/* Implementation Tasks Banner */}
@@ -27,7 +22,6 @@ export default function ProjectsPage() {
 					📋 Projects Page Implementation Tasks
 				</h3>
 				<ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
-					<li>• Task 4.1: Implement project CRUD operations</li>
 					<li>• Task 4.2: Create project listing and dashboard interface</li>
 					<li>• Task 4.5: Design and implement project cards and layouts</li>
 					<li>

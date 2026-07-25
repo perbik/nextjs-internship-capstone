@@ -1,8 +1,9 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import { canAccessProject } from "@/lib/db/queries/project-members";
 import { lists, projectMembers, projects, tasks } from "@/lib/db/schema";
+import type { ProjectFilters } from "@/lib/validations";
 
 const allProjectMembers = alias(projectMembers, "all_project_members");
 const projectLists = alias(lists, "project_lists");
@@ -17,7 +18,12 @@ export async function getProjectsForUser(userId: string) {
 		.orderBy(desc(projects.updatedAt));
 }
 
-export async function getProjectSummariesForUser(userId: string) {
+export async function getProjectSummariesForUser(
+	userId: string,
+	filters: ProjectFilters = {},
+) {
+	const search = filters.q ? `%${filters.q}%` : undefined;
+
 	return db
 		.select({
 			project: projects,
@@ -45,7 +51,20 @@ export async function getProjectSummariesForUser(userId: string) {
 				isNull(activeTasks.deletedAt),
 			),
 		)
-		.where(and(eq(projectMembers.userId, userId), isNull(projects.deletedAt)))
+		.where(
+			and(
+				eq(projectMembers.userId, userId),
+				isNull(projects.deletedAt),
+				filters.status ? eq(projects.status, filters.status) : undefined,
+				filters.role ? eq(projectMembers.role, filters.role) : undefined,
+				search
+					? or(
+							ilike(projects.name, search),
+							ilike(projects.description, search),
+						)
+					: undefined,
+			),
+		)
 		.groupBy(projects.id, projectMembers.role)
 		.orderBy(desc(projects.updatedAt));
 }

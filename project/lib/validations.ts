@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const PROJECT_STATUSES = ["active", "completed", "on_hold"] as const;
+const PROJECT_ROLES = ["owner", "admin", "member"] as const;
 const TASK_PRIORITIES = ["low", "medium", "high"] as const;
 
 const requiredText = (field: string, maximum: number) =>
@@ -87,6 +88,32 @@ export const taskUpdateSchema = taskCreateSchema
 	.partial()
 	.refine(hasUpdate, { message: "At least one task field is required" });
 
+export const projectFilterSchema = z.object({
+	q: optionalText("Search", 100),
+	status: z.preprocess(
+		(value) => (value === "" ? undefined : value),
+		z.enum(PROJECT_STATUSES).optional(),
+	),
+	role: z.preprocess(
+		(value) => (value === "" ? undefined : value),
+		z.enum(PROJECT_ROLES).optional(),
+	),
+});
+
+export const taskFilterSchema = z.object({
+	q: optionalText("Search", 200),
+	priority: z.preprocess(
+		(value) => (value === "" ? undefined : value),
+		z.enum(TASK_PRIORITIES).optional(),
+	),
+	assignee: z.preprocess(
+		(value) => (value === "" ? undefined : value),
+		z
+			.union([z.uuid("Assignee must be a valid ID"), z.literal("unassigned")])
+			.optional(),
+	),
+});
+
 export const userProfileSchema = z.object({
 	firstName: optionalText("First name", 100),
 	lastName: optionalText("Last name", 100),
@@ -126,6 +153,8 @@ export type ProjectInput = z.input<typeof projectSchema>;
 export type ProjectData = z.output<typeof projectSchema>;
 export type TaskInput = z.input<typeof taskSchema>;
 export type TaskData = z.output<typeof taskSchema>;
+export type ProjectFilters = z.output<typeof projectFilterSchema>;
+export type TaskFilters = z.output<typeof taskFilterSchema>;
 export type UserProfileInput = z.input<typeof userProfileSchema>;
 export type ListInput = z.input<typeof listSchema>;
 export type CommentInput = z.input<typeof commentSchema>;

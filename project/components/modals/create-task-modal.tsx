@@ -8,11 +8,13 @@ import {
 	type TaskActionState,
 	updateTaskAction,
 } from "@/app/(dashboard)/projects/[id]/task-actions";
+import type { TaskLabelOption } from "@/components/project-labels";
 import { useUIStore } from "@/stores/ui-store";
 
 export interface TaskMemberOption {
 	id: string;
 	name: string;
+	isCurrentUser?: boolean;
 }
 
 export interface TaskListOption {
@@ -28,12 +30,14 @@ export interface EditableTask {
 	priority: "low" | "medium" | "high";
 	dueDate: Date | null;
 	assigneeId: string | null;
+	labels: TaskLabelOption[];
 }
 
 interface TaskModalProps {
 	projectId: string;
 	lists: TaskListOption[];
 	members: TaskMemberOption[];
+	labels: TaskLabelOption[];
 	initialListId?: string;
 	task?: EditableTask;
 }
@@ -44,6 +48,7 @@ export function CreateTaskModal({
 	projectId,
 	lists,
 	members,
+	labels,
 	initialListId,
 }: Omit<TaskModalProps, "task">) {
 	return (
@@ -51,6 +56,7 @@ export function CreateTaskModal({
 			projectId={projectId}
 			lists={lists}
 			members={members}
+			labels={labels}
 			initialListId={initialListId}
 		/>
 	);
@@ -60,6 +66,7 @@ export function EditTaskModal({
 	projectId,
 	lists,
 	members,
+	labels,
 	task,
 }: TaskModalProps & { task: EditableTask }) {
 	return (
@@ -67,6 +74,7 @@ export function EditTaskModal({
 			projectId={projectId}
 			lists={lists}
 			members={members}
+			labels={labels}
 			task={task}
 		/>
 	);
@@ -76,6 +84,7 @@ function TaskModal({
 	projectId,
 	lists,
 	members,
+	labels,
 	initialListId,
 	task,
 }: TaskModalProps) {
@@ -213,7 +222,7 @@ function TaskModal({
 											{ value: "", label: "Unassigned" },
 											...members.map((member) => ({
 												value: member.id,
-												label: member.name,
+												label: `${member.name}${member.isCurrentUser ? " (You)" : ""}`,
 											})),
 										]}
 										error={state.errors?.assigneeId?.[0]}
@@ -230,6 +239,43 @@ function TaskModal({
 										error={state.errors?.dueDate?.[0]}
 									/>
 								</div>
+
+								<fieldset>
+									<legend className="mb-2 text-sm font-medium text-outer_space-500 dark:text-platinum-500">
+										Labels
+									</legend>
+									{labels.length > 0 ? (
+										<div className="flex flex-wrap gap-2">
+											{labels.map((label) => (
+												<label
+													key={label.id}
+													className="flex cursor-pointer items-center gap-2 rounded-full border border-french_gray-300 px-2.5 py-1.5 text-xs dark:border-paynes_gray-400"
+												>
+													<input
+														type="checkbox"
+														name="labelIds"
+														value={label.id}
+														defaultChecked={task?.labels.some(
+															(taskLabel) => taskLabel.id === label.id,
+														)}
+														className="size-3.5 accent-blue_munsell-500"
+													/>
+													<span
+														aria-hidden="true"
+														className="size-2.5 rounded-full"
+														style={{ backgroundColor: label.color }}
+													/>
+													{label.name}
+												</label>
+											))}
+										</div>
+									) : (
+										<p className="text-xs text-paynes_gray-500 dark:text-french_gray-400">
+											Create a project label before assigning one.
+										</p>
+									)}
+									<FieldError message={state.errors?.labelIds?.[0]} />
+								</fieldset>
 
 								{state.message && !state.success && (
 									<p

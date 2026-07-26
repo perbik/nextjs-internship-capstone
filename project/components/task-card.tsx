@@ -1,6 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Calendar, User } from "lucide-react";
+import { Calendar } from "lucide-react";
 import type { CSSProperties } from "react";
 import {
 	type EditableTask,
@@ -8,6 +8,7 @@ import {
 	type TaskListOption,
 	type TaskMemberOption,
 } from "@/components/modals/create-task-modal";
+import type { TaskLabelOption } from "@/components/project-labels";
 
 interface TaskCardProps {
 	projectId: string;
@@ -22,6 +23,7 @@ interface TaskCardProps {
 	};
 	lists: TaskListOption[];
 	members: TaskMemberOption[];
+	labels: TaskLabelOption[];
 }
 
 export interface TaskDragData {
@@ -45,6 +47,7 @@ export function TaskCard({
 	task,
 	lists,
 	members,
+	labels,
 }: TaskCardProps) {
 	const {
 		attributes,
@@ -72,6 +75,13 @@ export function TaskCard({
 				.filter(Boolean)
 				.join(" ") || task.assignee.email
 		: "Unassigned";
+	const assigneeInitials = task.assignee
+		? assigneeName
+				.split(/\s+/)
+				.slice(0, 2)
+				.map((part) => part[0]?.toUpperCase())
+				.join("")
+		: "—";
 
 	return (
 		<article
@@ -103,6 +113,7 @@ export function TaskCard({
 						projectId={projectId}
 						lists={lists}
 						members={members}
+						labels={labels}
 						task={task}
 					/>
 				</div>
@@ -112,6 +123,20 @@ export function TaskCard({
 				<p className="mt-2 line-clamp-2 text-xs text-paynes_gray-500 dark:text-french_gray-400">
 					{task.description}
 				</p>
+			)}
+
+			{task.labels.length > 0 && (
+				<div className="mt-2 flex flex-wrap gap-1">
+					{task.labels.map((label) => (
+						<span
+							key={label.id}
+							className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
+							style={{ backgroundColor: label.color }}
+						>
+							{label.name}
+						</span>
+					))}
+				</div>
 			)}
 
 			<div className="mt-3 flex items-center justify-between gap-2">
@@ -124,7 +149,12 @@ export function TaskCard({
 					className="flex min-w-0 items-center gap-1 text-xs text-paynes_gray-500 dark:text-french_gray-400"
 					title={assigneeName}
 				>
-					<User size={13} className="shrink-0" />
+					<span
+						aria-hidden="true"
+						className="flex size-5 shrink-0 items-center justify-center rounded-full bg-blue_munsell-100 text-[9px] font-semibold text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300"
+					>
+						{assigneeInitials}
+					</span>
 					<span className="max-w-24 truncate">{assigneeName}</span>
 				</span>
 			</div>

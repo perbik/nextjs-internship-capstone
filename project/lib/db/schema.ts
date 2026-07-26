@@ -8,6 +8,7 @@ import {
 	primaryKey,
 	text,
 	timestamp,
+	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
 
@@ -109,6 +110,28 @@ export const lists = pgTable(
 	],
 );
 
+export const labels = pgTable(
+	"labels",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		projectId: uuid("project_id")
+			.notNull()
+			.references(() => projects.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		color: text("color").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		index("labels_project_id_idx").on(table.projectId),
+		uniqueIndex("labels_project_name_unique").on(table.projectId, table.name),
+	],
+);
+
 export const tasks = pgTable(
 	"tasks",
 	{
@@ -137,6 +160,22 @@ export const tasks = pgTable(
 		index("tasks_assignee_id_idx").on(table.assigneeId),
 		index("tasks_deleted_at_idx").on(table.deletedAt),
 		index("tasks_list_position_idx").on(table.listId, table.position),
+	],
+);
+
+export const taskLabels = pgTable(
+	"task_labels",
+	{
+		taskId: uuid("task_id")
+			.notNull()
+			.references(() => tasks.id, { onDelete: "cascade" }),
+		labelId: uuid("label_id")
+			.notNull()
+			.references(() => labels.id, { onDelete: "cascade" }),
+	},
+	(table) => [
+		primaryKey({ columns: [table.taskId, table.labelId] }),
+		index("task_labels_label_id_idx").on(table.labelId),
 	],
 );
 
@@ -178,6 +217,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
 	}),
 	members: many(projectMembers),
 	lists: many(lists),
+	labels: many(labels),
 }));
 
 export const projectMembersRelations = relations(projectMembers, ({ one }) => ({
@@ -199,6 +239,14 @@ export const listsRelations = relations(lists, ({ one, many }) => ({
 	tasks: many(tasks),
 }));
 
+export const labelsRelations = relations(labels, ({ one, many }) => ({
+	project: one(projects, {
+		fields: [labels.projectId],
+		references: [projects.id],
+	}),
+	taskLabels: many(taskLabels),
+}));
+
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
 	list: one(lists, {
 		fields: [tasks.listId],
@@ -209,6 +257,18 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
 		references: [users.id],
 	}),
 	comments: many(comments),
+	taskLabels: many(taskLabels),
+}));
+
+export const taskLabelsRelations = relations(taskLabels, ({ one }) => ({
+	task: one(tasks, {
+		fields: [taskLabels.taskId],
+		references: [tasks.id],
+	}),
+	label: one(labels, {
+		fields: [taskLabels.labelId],
+		references: [labels.id],
+	}),
 }));
 
 export const commentsRelations = relations(comments, ({ one }) => ({
@@ -232,5 +292,9 @@ export type List = typeof lists.$inferSelect;
 export type NewList = typeof lists.$inferInsert;
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
+export type Label = typeof labels.$inferSelect;
+export type NewLabel = typeof labels.$inferInsert;
+export type TaskLabel = typeof taskLabels.$inferSelect;
+export type NewTaskLabel = typeof taskLabels.$inferInsert;
 export type Comment = typeof comments.$inferSelect;
 export type NewComment = typeof comments.$inferInsert;

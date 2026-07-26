@@ -1,27 +1,34 @@
 {
-	"version": "7",
-	"dialect": "postgresql",
-	"entries": [
-		{
-			"idx": 0,
-			"version": "7",
-			"when": 1784688818180,
-			"tag": "20260722025338_create_users_table",
-			"breakpoints": true
-		},
-		{
-			"idx": 1,
-			"version": "7",
-			"when": 1784770178317,
-			"tag": "20260723012938_create_project_management_schema",
-			"breakpoints": true
-		},
-		{
-			"idx": 2,
-			"version": "7",
-			"when": 1784786343361,
-			"tag": "20260723055903_add_is_completed_to_lists_table",
-			"breakpoints": true
-		}
-	]
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1784688818180,
+      "tag": "20260722025338_create_users_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784770178317,
+      "tag": "20260723012938_create_project_management_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784786343361,
+      "tag": "20260723055903_add_is_completed_to_lists_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785056207736,
+      "tag": "20260726085647_create_project_task_labels_tables",
+      "breakpoints": true
+    }
+  ]
 }

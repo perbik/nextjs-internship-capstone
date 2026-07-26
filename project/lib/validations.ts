@@ -77,6 +77,10 @@ export const taskSchema = z.object({
 	}),
 	dueDate: optionalDate("Due date"),
 	assigneeId: optionalUuid("Assignee"),
+	labelIds: z
+		.array(z.uuid("Label must be a valid ID"))
+		.max(10, "A task can have at most 10 labels")
+		.default([]),
 });
 
 export const taskCreateSchema = taskSchema.extend({
@@ -121,7 +125,11 @@ export const taskFilterSchema = z.object({
 	assignee: z.preprocess(
 		(value) => (value === "" ? undefined : value),
 		z
-			.union([z.uuid("Assignee must be a valid ID"), z.literal("unassigned")])
+			.union([
+				z.uuid("Assignee must be a valid ID"),
+				z.literal("me"),
+				z.literal("unassigned"),
+			])
 			.optional(),
 	),
 });
@@ -149,6 +157,15 @@ export const listUpdateSchema = listSchema
 	.partial()
 	.refine(hasUpdate, { message: "At least one list field is required" });
 
+export const labelSchema = z.object({
+	name: requiredText("Label name", 50),
+	color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Choose a valid label color"),
+});
+
+export const labelCreateSchema = labelSchema.extend({
+	projectId: z.uuid("Project must be a valid ID"),
+});
+
 export const commentSchema = z.object({
 	content: requiredText("Comment", 1000),
 });
@@ -169,4 +186,5 @@ export type ProjectFilters = z.output<typeof projectFilterSchema>;
 export type TaskFilters = z.output<typeof taskFilterSchema>;
 export type UserProfileInput = z.input<typeof userProfileSchema>;
 export type ListInput = z.input<typeof listSchema>;
+export type LabelInput = z.input<typeof labelSchema>;
 export type CommentInput = z.input<typeof commentSchema>;

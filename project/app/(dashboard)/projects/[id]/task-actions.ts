@@ -29,6 +29,9 @@ function taskFormData(formData: FormData) {
 		priority: formValue(formData, "priority"),
 		dueDate: formValue(formData, "dueDate"),
 		assigneeId: formValue(formData, "assigneeId"),
+		labelIds: formData
+			.getAll("labelIds")
+			.filter((value): value is string => typeof value === "string"),
 	};
 }
 
@@ -54,6 +57,7 @@ function normalizeTaskData(data: z.output<typeof taskCreateSchema>) {
 		priority: data.priority,
 		dueDate: data.dueDate ?? null,
 		assigneeId: data.assigneeId ?? null,
+		labelIds: data.labelIds,
 	};
 }
 

@@ -41,6 +41,7 @@ import {
 	CreateTaskModal,
 	type TaskMemberOption,
 } from "@/components/modals/create-task-modal";
+import type { TaskLabelOption } from "@/components/project-labels";
 import { TaskCard } from "@/components/task-card";
 import {
 	type BoardList,
@@ -52,6 +53,7 @@ interface KanbanBoardProps {
 	projectId: string;
 	lists: BoardList[];
 	members: TaskMemberOption[];
+	labels: TaskLabelOption[];
 	canManage: boolean;
 	dragEnabled: boolean;
 }
@@ -93,6 +95,7 @@ export function KanbanBoard({
 	projectId,
 	lists,
 	members,
+	labels,
 	canManage,
 	dragEnabled,
 }: KanbanBoardProps) {
@@ -321,6 +324,7 @@ export function KanbanBoard({
 							list={list}
 							lists={boardLists}
 							members={members}
+							labels={labels}
 							dragDisabled={!dragEnabled}
 							canManage={canManage}
 							canMoveLeft={index > 0}
@@ -396,6 +400,7 @@ function ListColumn({
 	list,
 	lists,
 	members,
+	labels,
 	dragDisabled,
 	canManage,
 	canMoveLeft,
@@ -405,6 +410,7 @@ function ListColumn({
 	list: BoardList;
 	lists: BoardList[];
 	members: TaskMemberOption[];
+	labels: TaskLabelOption[];
 	dragDisabled: boolean;
 	canManage: boolean;
 	canMoveLeft: boolean;
@@ -553,6 +559,7 @@ function ListColumn({
 								task={task}
 								lists={lists}
 								members={members}
+								labels={labels}
 							/>
 						))
 					) : (
@@ -565,6 +572,7 @@ function ListColumn({
 					projectId={projectId}
 					lists={lists}
 					members={members}
+					labels={labels}
 					initialListId={list.id}
 				/>
 			</div>

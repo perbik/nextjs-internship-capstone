@@ -4,7 +4,14 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import { db } from "@/lib/db";
 import { canAccessProject } from "@/lib/db/queries/project-members";
 import * as schema from "@/lib/db/schema";
-import { lists, projectMembers, projects, tasks } from "@/lib/db/schema";
+import {
+	labels,
+	lists,
+	projectMembers,
+	projects,
+	taskLabels,
+	tasks,
+} from "@/lib/db/schema";
 
 interface TaskMutationData {
 	listId: string;
@@ -13,6 +20,7 @@ interface TaskMutationData {
 	priority: "low" | "medium" | "high";
 	dueDate?: Date | null;
 	assigneeId?: string | null;
+	labelIds: string[];
 }
 
 async function getAccessibleList(listId: string, userId: string) {
@@ -53,6 +61,37 @@ async function requireProjectAssignee(
 	}
 }
 
+async function requireProjectLabels(projectId: string, labelIds: string[]) {
+	if (labelIds.length === 0) {
+		return;
+	}
+
+	const uniqueLabelIds = new Set(labelIds);
+
+	if (uniqueLabelIds.size !== labelIds.length) {
+		throw new Error("A label cannot be assigned more than once");
+	}
+
+	const projectLabels = await db
+		.select({ id: labels.id })
+		.from(labels)
+		.where(and(eq(labels.projectId, projectId), inArray(labels.id, labelIds)));
+
+	if (projectLabels.length !== labelIds.length) {
+		throw new Error("Every label must belong to this project");
+	}
+}
+
+async function syncTaskLabels(taskId: string, labelIds: string[]) {
+	await db.delete(taskLabels).where(eq(taskLabels.taskId, taskId));
+
+	if (labelIds.length > 0) {
+		await db
+			.insert(taskLabels)
+			.values(labelIds.map((labelId) => ({ taskId, labelId })));
+	}
+}
+
 async function touchProject(projectId: string) {
 	await db
 		.update(projects)
@@ -63,6 +102,7 @@ async function touchProject(projectId: string) {
 export async function createTask(userId: string, data: TaskMutationData) {
 	const list = await getAccessibleList(data.listId, userId);
 	await requireProjectAssignee(list.projectId, data.assigneeId);
+	await requireProjectLabels(list.projectId, data.labelIds);
 
 	const [positionResult] = await db
 		.select({
@@ -74,14 +114,17 @@ export async function createTask(userId: string, data: TaskMutationData) {
 	const [task] = await db
 		.insert(tasks)
 		.values({
-			...data,
+			listId: data.listId,
+			title: data.title,
 			description: data.description ?? null,
+			priority: data.priority,
 			dueDate: data.dueDate ?? null,
 			assigneeId: data.assigneeId ?? null,
 			position: Number(positionResult?.nextPosition ?? 0),
 		})
 		.returning();
 
+	await syncTaskLabels(task.id, data.labelIds);
 	await touchProject(list.projectId);
 	return task;
 }
@@ -112,6 +155,7 @@ export async function updateTask(
 	}
 
 	await requireProjectAssignee(currentTask.projectId, data.assigneeId);
+	await requireProjectLabels(currentTask.projectId, data.labelIds);
 	let targetPosition = currentTask.task.position;
 
 	if (data.listId !== currentTask.task.listId) {
@@ -155,6 +199,7 @@ export async function updateTask(
 			);
 	}
 
+	await syncTaskLabels(taskId, data.labelIds);
 	await touchProject(currentTask.projectId);
 	return task;
 }

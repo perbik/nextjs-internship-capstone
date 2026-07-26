@@ -15,6 +15,11 @@ export interface BoardTask {
 		lastName: string | null;
 		email: string;
 	} | null;
+	labels: Array<{
+		id: string;
+		name: string;
+		color: string;
+	}>;
 }
 
 export interface BoardList {

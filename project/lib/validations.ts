@@ -88,14 +88,16 @@ export const taskUpdateSchema = taskCreateSchema
 	.partial()
 	.refine(hasUpdate, { message: "At least one task field is required" });
 
-export const taskMoveSchema = z.object({
+export const boardLayoutSchema = z.object({
 	projectId: z.uuid("Project must be a valid ID"),
-	taskId: z.uuid("Task must be a valid ID"),
-	targetListId: z.uuid("Target list must be a valid ID"),
-	targetPosition: z
-		.number()
-		.int("Target position must be a whole number")
-		.nonnegative("Target position cannot be negative"),
+	lists: z
+		.array(
+			z.object({
+				id: z.uuid("List must be a valid ID"),
+				taskIds: z.array(z.uuid("Task must be a valid ID")),
+			}),
+		)
+		.min(1, "The board must contain at least one list"),
 });
 
 export const projectFilterSchema = z.object({

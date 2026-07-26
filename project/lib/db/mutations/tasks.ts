@@ -1,5 +1,5 @@
 import { Pool } from "@neondatabase/serverless";
-import { and, asc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { db } from "@/lib/db";
 import { canAccessProject } from "@/lib/db/queries/project-members";
@@ -159,30 +159,13 @@ export async function updateTask(
 	return task;
 }
 
-export async function moveTask(
-	taskId: string,
-	targetListId: string,
-	targetPosition: number,
+export async function saveBoardLayout(
+	projectId: string,
 	userId: string,
+	layout: Array<{ id: string; taskIds: string[] }>,
 ) {
-	const [currentTask] = await db
-		.select({ task: tasks, projectId: lists.projectId })
-		.from(tasks)
-		.innerJoin(lists, eq(tasks.listId, lists.id))
-		.where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt)))
-		.limit(1);
-
-	if (
-		!currentTask ||
-		!(await canAccessProject(currentTask.projectId, userId))
-	) {
-		throw new Error("You do not have permission to move this task");
-	}
-
-	const targetList = await getAccessibleList(targetListId, userId);
-
-	if (targetList.projectId !== currentTask.projectId) {
-		throw new Error("A task cannot be moved to a different project");
+	if (!(await canAccessProject(projectId, userId))) {
+		throw new Error("You do not have permission to update this board");
 	}
 
 	const databaseUrl = process.env.DATABASE_URL;
@@ -197,76 +180,49 @@ export async function moveTask(
 	try {
 		await transactionDb.transaction(async (tx) => {
 			await tx.execute(
-				sql`select pg_advisory_xact_lock(hashtextextended(${currentTask.projectId}, 0))`,
+				sql`select pg_advisory_xact_lock(hashtextextended(${projectId}, 0))`,
 			);
 
-			const [lockedTask] = await tx
-				.select({ task: tasks, projectId: lists.projectId })
-				.from(tasks)
-				.innerJoin(lists, eq(tasks.listId, lists.id))
-				.where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt)))
-				.limit(1);
-
-			if (!lockedTask || lockedTask.projectId !== currentTask.projectId) {
-				throw new Error("The task is no longer available");
-			}
-
-			const [lockedTargetList] = await tx
-				.select({ projectId: lists.projectId })
+			const projectLists = await tx
+				.select({ id: lists.id })
 				.from(lists)
-				.where(eq(lists.id, targetListId))
-				.limit(1);
+				.where(eq(lists.projectId, projectId));
+			const validListIds = new Set(projectLists.map(({ id }) => id));
+			const submittedListIds = layout.map(({ id }) => id);
 
-			if (lockedTargetList?.projectId !== lockedTask.projectId) {
-				throw new Error("The target list is no longer available");
+			if (
+				submittedListIds.length !== validListIds.size ||
+				new Set(submittedListIds).size !== submittedListIds.length ||
+				submittedListIds.some((id) => !validListIds.has(id))
+			) {
+				throw new Error(
+					"The board columns have changed. Reload and try again.",
+				);
 			}
 
-			const sourceTasks = await tx
+			const projectTasks = await tx
 				.select({ id: tasks.id })
 				.from(tasks)
-				.where(
-					and(
-						eq(tasks.listId, lockedTask.task.listId),
-						isNull(tasks.deletedAt),
-					),
-				)
-				.orderBy(asc(tasks.position));
-			const sourceIds = sourceTasks
-				.map(({ id }) => id)
-				.filter((id) => id !== taskId);
+				.innerJoin(lists, eq(tasks.listId, lists.id))
+				.where(and(eq(lists.projectId, projectId), isNull(tasks.deletedAt)));
+			const validTaskIds = new Set(projectTasks.map(({ id }) => id));
+			const submittedTaskIds = layout.flatMap(({ taskIds }) => taskIds);
 
-			if (targetListId === lockedTask.task.listId) {
-				const nextPosition = Math.min(targetPosition, sourceIds.length);
-				sourceIds.splice(nextPosition, 0, taskId);
-				await persistTaskOrder(sourceIds, targetListId);
-			} else {
-				const targetTasks = await tx
-					.select({ id: tasks.id })
-					.from(tasks)
-					.where(and(eq(tasks.listId, targetListId), isNull(tasks.deletedAt)))
-					.orderBy(asc(tasks.position));
-				const targetIds = targetTasks
-					.map(({ id }) => id)
-					.filter((id) => id !== taskId);
-				const nextPosition = Math.min(targetPosition, targetIds.length);
-
-				targetIds.splice(nextPosition, 0, taskId);
-				await persistTaskOrder(sourceIds, lockedTask.task.listId);
-				await persistTaskOrder(targetIds, targetListId);
+			if (
+				submittedTaskIds.length !== validTaskIds.size ||
+				new Set(submittedTaskIds).size !== submittedTaskIds.length ||
+				submittedTaskIds.some((id) => !validTaskIds.has(id))
+			) {
+				throw new Error("The board tasks have changed. Reload and try again.");
 			}
 
-			await tx
-				.update(projects)
-				.set({ updatedAt: new Date() })
-				.where(eq(projects.id, lockedTask.projectId));
-
-			async function persistTaskOrder(taskIds: string[], listId: string) {
-				if (taskIds.length === 0) {
-					return;
+			for (const list of layout) {
+				if (list.taskIds.length === 0) {
+					continue;
 				}
 
 				const positionCases = sql.join(
-					taskIds.map(
+					list.taskIds.map(
 						(id, position) => sql`when ${tasks.id} = ${id} then ${position}`,
 					),
 					sql.raw(" "),
@@ -275,12 +231,17 @@ export async function moveTask(
 				await tx
 					.update(tasks)
 					.set({
-						listId,
+						listId: list.id,
 						position: sql`case ${positionCases} else ${tasks.position} end`,
 						updatedAt: new Date(),
 					})
-					.where(and(inArray(tasks.id, taskIds), isNull(tasks.deletedAt)));
+					.where(and(inArray(tasks.id, list.taskIds), isNull(tasks.deletedAt)));
 			}
+
+			await tx
+				.update(projects)
+				.set({ updatedAt: new Date() })
+				.where(eq(projects.id, projectId));
 		});
 	} finally {
 		await pool.end();

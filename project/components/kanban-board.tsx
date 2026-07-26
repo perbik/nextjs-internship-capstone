@@ -1,11 +1,24 @@
 "use client";
 
 import {
-	DragDropProvider,
+	closestCorners,
+	DndContext,
+	type DragCancelEvent,
 	type DragEndEvent,
+	type DragOverEvent,
+	DragOverlay,
+	type DragStartEvent,
+	KeyboardSensor,
+	PointerSensor,
 	useDroppable,
-} from "@dnd-kit/react";
-import { isSortable } from "@dnd-kit/react/sortable";
+	useSensor,
+	useSensors,
+} from "@dnd-kit/core";
+import {
+	SortableContext,
+	sortableKeyboardCoordinates,
+	verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import {
 	ArrowLeft,
 	ArrowRight,
@@ -14,7 +27,7 @@ import {
 	Plus,
 	Trash2,
 } from "lucide-react";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
 	createListAction,
@@ -23,12 +36,12 @@ import {
 	moveListAction,
 	updateListAction,
 } from "@/app/(dashboard)/projects/[id]/list-actions";
-import { moveTaskAction } from "@/app/(dashboard)/projects/[id]/task-actions";
+import { saveBoardLayoutAction } from "@/app/(dashboard)/projects/[id]/task-actions";
 import {
 	CreateTaskModal,
 	type TaskMemberOption,
 } from "@/components/modals/create-task-modal";
-import { TaskCard, type TaskDragData } from "@/components/task-card";
+import { TaskCard } from "@/components/task-card";
 import {
 	type BoardList,
 	type BoardMove,
@@ -43,13 +56,38 @@ interface KanbanBoardProps {
 	dragEnabled: boolean;
 }
 
-interface ColumnDropData {
-	kind: "column";
-	listId: string;
-	index: number;
+const initialState: ListActionState = { message: "" };
+
+function findTaskLocation(lists: BoardList[], taskId: string) {
+	for (const list of lists) {
+		const position = list.tasks.findIndex((task) => task.id === taskId);
+
+		if (position >= 0) {
+			return {
+				listId: list.id,
+				position,
+				task: list.tasks[position],
+			};
+		}
+	}
+
+	return null;
 }
 
-const initialState: ListActionState = { message: "" };
+function getDropLocation(data: Record<string, unknown> | undefined) {
+	if (
+		(data?.kind !== "task" && data?.kind !== "column") ||
+		typeof data.listId !== "string" ||
+		typeof data.index !== "number"
+	) {
+		return null;
+	}
+
+	return {
+		listId: data.listId,
+		position: data.index,
+	};
+}
 
 export function KanbanBoard({
 	projectId,
@@ -70,12 +108,29 @@ export function KanbanBoard({
 		syncBoard,
 		startDragging,
 		stopDragging,
+		cancelDragging,
+		previewMove,
 		queueMove,
-		confirmMove,
-		rejectMove,
+		confirmSnapshot,
+		rejectSnapshot,
 		clearMoveError,
 	} = useBoardStore();
-	const moveRequestQueue = useRef(Promise.resolve());
+	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const saveInFlight = useRef(false);
+	const dragOrigin = useRef<{
+		taskId: string;
+		listId: string;
+		position: number;
+	} | null>(null);
+	const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+	const sensors = useSensors(
+		useSensor(PointerSensor, {
+			activationConstraint: { distance: 4 },
+		}),
+		useSensor(KeyboardSensor, {
+			coordinateGetter: sortableKeyboardCoordinates,
+		}),
+	);
 	const boardLists = storedProjectId === projectId ? storedLists : lists;
 	const isMoving = pendingMoves.length > 0;
 
@@ -83,87 +138,161 @@ export function KanbanBoard({
 		syncBoard(projectId, lists);
 	}, [lists, projectId, syncBoard]);
 
+	function handleDragStart(event: DragStartEvent) {
+		const location = findTaskLocation(boardLists, String(event.active.id));
+
+		if (!location) {
+			return;
+		}
+
+		dragOrigin.current = {
+			taskId: String(event.active.id),
+			listId: location.listId,
+			position: location.position,
+		};
+		setActiveTaskId(String(event.active.id));
+		startDragging();
+		clearMoveError();
+	}
+
+	function handleDragOver(event: DragOverEvent) {
+		const origin = dragOrigin.current;
+
+		if (!origin || !event.over) {
+			return;
+		}
+
+		const current = findTaskLocation(boardLists, origin.taskId);
+		const target = getDropLocation(event.over.data.current);
+
+		if (
+			!current ||
+			!target ||
+			(current.listId === target.listId && current.position === target.position)
+		) {
+			return;
+		}
+
+		previewMove({
+			taskId: origin.taskId,
+			sourceListId: current.listId,
+			targetListId: target.listId,
+			targetPosition: target.position,
+		});
+	}
+
+	function handleDragCancel(_event: DragCancelEvent) {
+		dragOrigin.current = null;
+		setActiveTaskId(null);
+		cancelDragging();
+	}
+
 	function handleDragEnd(event: DragEndEvent) {
+		const origin = dragOrigin.current;
+		const finalLocation = event.over
+			? getDropLocation(event.over.data.current)
+			: null;
+
+		dragOrigin.current = null;
+		setActiveTaskId(null);
 		stopDragging();
 
-		if (event.canceled || !dragEnabled) {
+		if (!origin || !finalLocation || !dragEnabled) {
+			cancelDragging();
 			return;
 		}
 
-		const source = event.operation.source;
-
-		if (!isSortable(source)) {
-			return;
-		}
-
-		const task = source.data as TaskDragData;
-		if (task.kind !== "task") {
-			return;
-		}
-
-		const dropTarget = event.operation.target?.data as
-			| TaskDragData
-			| ColumnDropData
-			| undefined;
-
-		if (!dropTarget) {
-			return;
-		}
-
-		const targetListId = dropTarget.listId;
-		const targetPosition = dropTarget.index;
-		const initialListId =
-			typeof source.initialGroup === "string"
-				? source.initialGroup
-				: task.listId;
-		const initialPosition = source.initialIndex;
-
-		if (initialListId === targetListId && initialPosition === targetPosition) {
+		if (
+			origin.listId === finalLocation.listId &&
+			origin.position === finalLocation.position
+		) {
+			cancelDragging();
 			return;
 		}
 
 		const move: BoardMove = {
 			id: crypto.randomUUID(),
-			taskId: task.taskId,
-			sourceListId: initialListId,
-			targetListId,
-			targetPosition,
+			taskId: origin.taskId,
+			sourceListId: origin.listId,
+			targetListId: finalLocation.listId,
+			targetPosition: finalLocation.position,
 		};
 
 		queueMove(move);
-		clearMoveError();
-		moveRequestQueue.current = moveRequestQueue.current.then(() =>
-			persistTaskMove(move),
-		);
+		scheduleSave();
 	}
 
-	async function persistTaskMove(move: BoardMove) {
+	function scheduleSave(delay = 250) {
+		if (saveTimer.current) {
+			clearTimeout(saveTimer.current);
+		}
+
+		saveTimer.current = setTimeout(() => {
+			saveTimer.current = null;
+			void persistBoardSnapshot();
+		}, delay);
+	}
+
+	async function persistBoardSnapshot() {
+		if (saveInFlight.current) {
+			return;
+		}
+
+		const state = useBoardStore.getState();
+		const capturedMoves = [...state.pendingMoves];
+
+		if (capturedMoves.length === 0) {
+			return;
+		}
+
+		const snapshot = state.lists.map((list) => ({
+			...list,
+			tasks: [...list.tasks],
+		}));
+		saveInFlight.current = true;
+
 		try {
-			const result = await moveTaskAction({
+			const result = await saveBoardLayoutAction({
 				projectId,
-				taskId: move.taskId,
-				targetListId: move.targetListId,
-				targetPosition: move.targetPosition,
+				lists: snapshot.map((list) => ({
+					id: list.id,
+					taskIds: list.tasks.map((task) => task.id),
+				})),
 			});
 
 			if (result.success) {
-				confirmMove(move.id);
+				confirmSnapshot(
+					capturedMoves.map((move) => move.id),
+					snapshot,
+				);
 			} else {
-				rejectMove(move.id, result.message);
+				rejectSnapshot(
+					capturedMoves.map((move) => move.id),
+					result.message,
+				);
 			}
 		} catch {
-			rejectMove(
-				move.id,
+			rejectSnapshot(
+				capturedMoves.map((move) => move.id),
 				"Unable to save the task position. Please try again.",
 			);
+		} finally {
+			saveInFlight.current = false;
+
+			if (useBoardStore.getState().pendingMoves.length > 0) {
+				scheduleSave(0);
+			}
 		}
 	}
 
 	return (
-		<DragDropProvider
-			onDragStart={startDragging}
-			onDragOver={(event) => event.preventDefault()}
+		<DndContext
+			sensors={sensors}
+			collisionDetection={closestCorners}
+			onDragStart={handleDragStart}
+			onDragOver={handleDragOver}
 			onDragEnd={handleDragEnd}
+			onDragCancel={handleDragCancel}
 		>
 			<div className="overflow-hidden rounded-lg border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
 				{!dragEnabled && (
@@ -172,7 +301,7 @@ export function KanbanBoard({
 					</p>
 				)}
 				{isMoving && (
-					<p className="mb-4 text-sm text-blue_munsell-600 dark:text-blue_munsell-400">
+					<p className="sr-only" role="status" aria-live="polite">
 						Saving task position...
 					</p>
 				)}
@@ -251,7 +380,14 @@ export function KanbanBoard({
 					)}
 				</div>
 			</div>
-		</DragDropProvider>
+			<DragOverlay dropAnimation={null}>
+				{activeTaskId ? (
+					<div className="w-72 rounded-lg border border-blue_munsell-400 bg-white p-3 text-sm font-medium text-outer_space-500 shadow-xl dark:bg-outer_space-300 dark:text-platinum-500">
+						{findTaskLocation(boardLists, activeTaskId)?.task.title}
+					</div>
+				) : null}
+			</DragOverlay>
+		</DndContext>
 	);
 }
 
@@ -282,10 +418,8 @@ function ListColumn({
 		deleteListAction,
 		initialState,
 	);
-	const { ref: dropRef, isDropTarget } = useDroppable<ColumnDropData>({
+	const { setNodeRef: dropRef, isOver: isDropTarget } = useDroppable({
 		id: `column-${list.id}`,
-		type: "column",
-		accept: "task",
 		data: {
 			kind: "column",
 			listId: list.id,
@@ -405,23 +539,28 @@ function ListColumn({
 					isDropTarget ? "bg-blue_munsell-50 dark:bg-blue_munsell-900/20" : ""
 				}`}
 			>
-				{list.tasks.length > 0 ? (
-					list.tasks.map((task, index) => (
-						<TaskCard
-							key={task.id}
-							projectId={projectId}
-							index={index}
-							dragDisabled={dragDisabled}
-							task={task}
-							lists={lists}
-							members={members}
-						/>
-					))
-				) : (
-					<p className="py-8 text-center text-sm text-paynes_gray-500 dark:text-french_gray-400">
-						No tasks in this column
-					</p>
-				)}
+				<SortableContext
+					items={list.tasks.map((task) => task.id)}
+					strategy={verticalListSortingStrategy}
+				>
+					{list.tasks.length > 0 ? (
+						list.tasks.map((task, index) => (
+							<TaskCard
+								key={task.id}
+								projectId={projectId}
+								index={index}
+								dragDisabled={dragDisabled}
+								task={task}
+								lists={lists}
+								members={members}
+							/>
+						))
+					) : (
+						<p className="py-8 text-center text-sm text-paynes_gray-500 dark:text-french_gray-400">
+							No tasks in this column
+						</p>
+					)}
+				</SortableContext>
 				<CreateTaskModal
 					projectId={projectId}
 					lists={lists}

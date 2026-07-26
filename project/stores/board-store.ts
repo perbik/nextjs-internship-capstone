@@ -43,9 +43,11 @@ interface BoardState {
 	syncBoard: (projectId: string, lists: BoardList[]) => void;
 	startDragging: () => void;
 	stopDragging: () => void;
+	cancelDragging: () => void;
+	previewMove: (move: Omit<BoardMove, "id">) => void;
 	queueMove: (move: BoardMove) => void;
-	confirmMove: (moveId: string) => void;
-	rejectMove: (moveId: string, error: string) => void;
+	confirmSnapshot: (moveIds: string[], savedLists: BoardList[]) => void;
+	rejectSnapshot: (moveIds: string[], error: string) => void;
 	clearMoveError: () => void;
 }
 
@@ -127,6 +129,16 @@ export const useBoardStore = create<BoardState>()((set) => ({
 
 	startDragging: () => set({ isDragging: true }),
 	stopDragging: () => set({ isDragging: false }),
+	cancelDragging: () =>
+		set((state) => ({
+			isDragging: false,
+			lists: replayMoves(state.confirmedLists, state.pendingMoves),
+		})),
+
+	previewMove: (move) =>
+		set((state) => ({
+			lists: moveTaskBetweenLists(state.lists, move),
+		})),
 
 	queueMove: (move) =>
 		set((state) => ({
@@ -134,35 +146,25 @@ export const useBoardStore = create<BoardState>()((set) => ({
 			pendingMoves: [...state.pendingMoves, move],
 		})),
 
-	confirmMove: (moveId) =>
+	confirmSnapshot: (moveIds, savedLists) =>
 		set((state) => {
-			const confirmedMove = state.pendingMoves.find(
-				(move) => move.id === moveId,
-			);
-
-			if (!confirmedMove) {
-				return state;
-			}
-
-			const confirmedLists = moveTaskBetweenLists(
-				state.confirmedLists,
-				confirmedMove,
-			);
+			const confirmedIds = new Set(moveIds);
 			const pendingMoves = state.pendingMoves.filter(
-				(move) => move.id !== moveId,
+				(move) => !confirmedIds.has(move.id),
 			);
 
 			return {
-				confirmedLists,
+				confirmedLists: savedLists,
 				pendingMoves,
-				lists: replayMoves(confirmedLists, pendingMoves),
+				lists: replayMoves(savedLists, pendingMoves),
 			};
 		}),
 
-	rejectMove: (moveId, error) =>
+	rejectSnapshot: (moveIds, error) =>
 		set((state) => {
+			const rejectedIds = new Set(moveIds);
 			const pendingMoves = state.pendingMoves.filter(
-				(move) => move.id !== moveId,
+				(move) => !rejectedIds.has(move.id),
 			);
 
 			return {

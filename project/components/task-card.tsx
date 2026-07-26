@@ -1,5 +1,7 @@
-import { useSortable } from "@dnd-kit/react/sortable";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Calendar, User } from "lucide-react";
+import type { CSSProperties } from "react";
 import {
 	type EditableTask,
 	EditTaskModal,
@@ -44,12 +46,15 @@ export function TaskCard({
 	lists,
 	members,
 }: TaskCardProps) {
-	const { ref, isDragging } = useSortable<TaskDragData>({
+	const {
+		attributes,
+		listeners,
+		setNodeRef,
+		transform,
+		transition,
+		isDragging,
+	} = useSortable({
 		id: task.id,
-		index,
-		group: task.listId,
-		type: "task",
-		accept: "task",
 		data: {
 			kind: "task",
 			taskId: task.id,
@@ -58,6 +63,10 @@ export function TaskCard({
 		},
 		disabled: dragDisabled,
 	});
+	const style: CSSProperties = {
+		transform: CSS.Transform.toString(transform),
+		transition,
+	};
 	const assigneeName = task.assignee
 		? [task.assignee.firstName, task.assignee.lastName]
 				.filter(Boolean)
@@ -66,7 +75,10 @@ export function TaskCard({
 
 	return (
 		<article
-			ref={ref}
+			ref={setNodeRef}
+			style={style}
+			{...attributes}
+			{...listeners}
 			tabIndex={dragDisabled ? -1 : 0}
 			aria-label={`${task.title}. Drag to reorder or move to another column.`}
 			className={`touch-pan-y rounded-lg border border-french_gray-300 bg-white p-3 transition-[opacity,box-shadow,border-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-300 ${

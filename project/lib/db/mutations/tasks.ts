@@ -1,6 +1,9 @@
-import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
+import { Pool } from "@neondatabase/serverless";
+import { and, asc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/neon-serverless";
 import { db } from "@/lib/db";
 import { canAccessProject } from "@/lib/db/queries/project-members";
+import * as schema from "@/lib/db/schema";
 import { lists, projectMembers, projects, tasks } from "@/lib/db/schema";
 
 interface TaskMutationData {
@@ -182,51 +185,104 @@ export async function moveTask(
 		throw new Error("A task cannot be moved to a different project");
 	}
 
-	const sourceTasks = await db
-		.select({ id: tasks.id })
-		.from(tasks)
-		.where(
-			and(eq(tasks.listId, currentTask.task.listId), isNull(tasks.deletedAt)),
-		)
-		.orderBy(asc(tasks.position));
-	const sourceIds = sourceTasks
-		.map(({ id }) => id)
-		.filter((id) => id !== taskId);
+	const databaseUrl = process.env.DATABASE_URL;
 
-	if (targetListId === currentTask.task.listId) {
-		const nextPosition = Math.min(targetPosition, sourceIds.length);
-		sourceIds.splice(nextPosition, 0, taskId);
-		await persistTaskOrder(sourceIds, targetListId);
-	} else {
-		const targetTasks = await db
-			.select({ id: tasks.id })
-			.from(tasks)
-			.where(and(eq(tasks.listId, targetListId), isNull(tasks.deletedAt)))
-			.orderBy(asc(tasks.position));
-		const targetIds = targetTasks
-			.map(({ id }) => id)
-			.filter((id) => id !== taskId);
-		const nextPosition = Math.min(targetPosition, targetIds.length);
-
-		targetIds.splice(nextPosition, 0, taskId);
-		await Promise.all([
-			persistTaskOrder(sourceIds, currentTask.task.listId),
-			persistTaskOrder(targetIds, targetListId),
-		]);
+	if (!databaseUrl) {
+		throw new Error("DATABASE_URL is required");
 	}
 
-	await touchProject(currentTask.projectId);
-}
+	const pool = new Pool({ connectionString: databaseUrl });
+	const transactionDb = drizzle({ client: pool, schema });
 
-async function persistTaskOrder(taskIds: string[], listId: string) {
-	const now = new Date();
+	try {
+		await transactionDb.transaction(async (tx) => {
+			await tx.execute(
+				sql`select pg_advisory_xact_lock(hashtextextended(${currentTask.projectId}, 0))`,
+			);
 
-	await Promise.all(
-		taskIds.map((id, position) =>
-			db
-				.update(tasks)
-				.set({ listId, position, updatedAt: now })
-				.where(and(eq(tasks.id, id), isNull(tasks.deletedAt))),
-		),
-	);
+			const [lockedTask] = await tx
+				.select({ task: tasks, projectId: lists.projectId })
+				.from(tasks)
+				.innerJoin(lists, eq(tasks.listId, lists.id))
+				.where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt)))
+				.limit(1);
+
+			if (!lockedTask || lockedTask.projectId !== currentTask.projectId) {
+				throw new Error("The task is no longer available");
+			}
+
+			const [lockedTargetList] = await tx
+				.select({ projectId: lists.projectId })
+				.from(lists)
+				.where(eq(lists.id, targetListId))
+				.limit(1);
+
+			if (lockedTargetList?.projectId !== lockedTask.projectId) {
+				throw new Error("The target list is no longer available");
+			}
+
+			const sourceTasks = await tx
+				.select({ id: tasks.id })
+				.from(tasks)
+				.where(
+					and(
+						eq(tasks.listId, lockedTask.task.listId),
+						isNull(tasks.deletedAt),
+					),
+				)
+				.orderBy(asc(tasks.position));
+			const sourceIds = sourceTasks
+				.map(({ id }) => id)
+				.filter((id) => id !== taskId);
+
+			if (targetListId === lockedTask.task.listId) {
+				const nextPosition = Math.min(targetPosition, sourceIds.length);
+				sourceIds.splice(nextPosition, 0, taskId);
+				await persistTaskOrder(sourceIds, targetListId);
+			} else {
+				const targetTasks = await tx
+					.select({ id: tasks.id })
+					.from(tasks)
+					.where(and(eq(tasks.listId, targetListId), isNull(tasks.deletedAt)))
+					.orderBy(asc(tasks.position));
+				const targetIds = targetTasks
+					.map(({ id }) => id)
+					.filter((id) => id !== taskId);
+				const nextPosition = Math.min(targetPosition, targetIds.length);
+
+				targetIds.splice(nextPosition, 0, taskId);
+				await persistTaskOrder(sourceIds, lockedTask.task.listId);
+				await persistTaskOrder(targetIds, targetListId);
+			}
+
+			await tx
+				.update(projects)
+				.set({ updatedAt: new Date() })
+				.where(eq(projects.id, lockedTask.projectId));
+
+			async function persistTaskOrder(taskIds: string[], listId: string) {
+				if (taskIds.length === 0) {
+					return;
+				}
+
+				const positionCases = sql.join(
+					taskIds.map(
+						(id, position) => sql`when ${tasks.id} = ${id} then ${position}`,
+					),
+					sql.raw(" "),
+				);
+
+				await tx
+					.update(tasks)
+					.set({
+						listId,
+						position: sql`case ${positionCases} else ${tasks.position} end`,
+						updatedAt: new Date(),
+					})
+					.where(and(inArray(tasks.id, taskIds), isNull(tasks.deletedAt)));
+			}
+		});
+	} finally {
+		await pool.end();
+	}
 }

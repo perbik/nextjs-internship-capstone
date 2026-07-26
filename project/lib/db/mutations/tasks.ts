@@ -2,15 +2,18 @@ import { Pool } from "@neondatabase/serverless";
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { db } from "@/lib/db";
+import { recordTaskActivity } from "@/lib/db/mutations/activities";
 import { canAccessProject } from "@/lib/db/queries/project-members";
 import * as schema from "@/lib/db/schema";
 import {
+	activityLogs,
 	labels,
 	lists,
 	projectMembers,
 	projects,
 	taskLabels,
 	tasks,
+	users,
 } from "@/lib/db/schema";
 
 interface TaskMutationData {
@@ -99,6 +102,20 @@ async function touchProject(projectId: string) {
 		.where(eq(projects.id, projectId));
 }
 
+function sameDate(left: Date | null, right: Date | null) {
+	return left?.getTime() === right?.getTime();
+}
+
+function userDisplayName(user: {
+	firstName: string | null;
+	lastName: string | null;
+	email: string;
+}) {
+	return (
+		[user.firstName, user.lastName].filter(Boolean).join(" ") || user.email
+	);
+}
+
 export async function createTask(userId: string, data: TaskMutationData) {
 	const list = await getAccessibleList(data.listId, userId);
 	await requireProjectAssignee(list.projectId, data.assigneeId);
@@ -126,6 +143,13 @@ export async function createTask(userId: string, data: TaskMutationData) {
 
 	await syncTaskLabels(task.id, data.labelIds);
 	await touchProject(list.projectId);
+	await recordTaskActivity({
+		projectId: list.projectId,
+		taskId: task.id,
+		actorId: userId,
+		action: "task_created",
+		metadata: { title: task.title },
+	});
 	return task;
 }
 
@@ -135,7 +159,11 @@ export async function updateTask(
 	data: TaskMutationData,
 ) {
 	const [currentTask] = await db
-		.select({ task: tasks, projectId: lists.projectId })
+		.select({
+			task: tasks,
+			projectId: lists.projectId,
+			listName: lists.name,
+		})
 		.from(tasks)
 		.innerJoin(lists, eq(tasks.listId, lists.id))
 		.where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt)))
@@ -156,6 +184,111 @@ export async function updateTask(
 
 	await requireProjectAssignee(currentTask.projectId, data.assigneeId);
 	await requireProjectLabels(currentTask.projectId, data.labelIds);
+
+	const currentTaskLabels = await db
+		.select({ id: labels.id, name: labels.name })
+		.from(taskLabels)
+		.innerJoin(labels, eq(taskLabels.labelId, labels.id))
+		.where(eq(taskLabels.taskId, taskId));
+	const comparedLabelIds = [
+		...new Set([...currentTaskLabels.map(({ id }) => id), ...data.labelIds]),
+	];
+	const comparedLabels =
+		comparedLabelIds.length > 0
+			? await db
+					.select({ id: labels.id, name: labels.name })
+					.from(labels)
+					.where(inArray(labels.id, comparedLabelIds))
+			: [];
+	const labelNames = new Map(comparedLabels.map(({ id, name }) => [id, name]));
+	const assigneeIds = [
+		...new Set(
+			[currentTask.task.assigneeId, data.assigneeId].filter(
+				(id): id is string => Boolean(id),
+			),
+		),
+	];
+	const comparedAssignees =
+		assigneeIds.length > 0
+			? await db
+					.select({
+						id: users.id,
+						firstName: users.firstName,
+						lastName: users.lastName,
+						email: users.email,
+					})
+					.from(users)
+					.where(inArray(users.id, assigneeIds))
+			: [];
+	const assigneeNames = new Map(
+		comparedAssignees.map((assignee) => [
+			assignee.id,
+			userDisplayName(assignee),
+		]),
+	);
+	const currentLabelNames = currentTaskLabels
+		.map(({ name }) => name)
+		.sort()
+		.join(", ");
+	const nextLabelNames = data.labelIds
+		.map((id) => labelNames.get(id))
+		.filter((name): name is string => Boolean(name))
+		.sort()
+		.join(", ");
+	const fieldChanges: Array<{
+		field: string;
+		from: string | null;
+		to: string | null;
+	}> = [];
+
+	if (currentTask.task.title !== data.title) {
+		fieldChanges.push({
+			field: "title",
+			from: currentTask.task.title,
+			to: data.title,
+		});
+	}
+
+	if (currentTask.task.description !== (data.description ?? null)) {
+		fieldChanges.push({ field: "description", from: null, to: null });
+	}
+
+	if (currentTask.task.priority !== data.priority) {
+		fieldChanges.push({
+			field: "priority",
+			from: currentTask.task.priority,
+			to: data.priority,
+		});
+	}
+
+	if (!sameDate(currentTask.task.dueDate, data.dueDate ?? null)) {
+		fieldChanges.push({
+			field: "dueDate",
+			from: currentTask.task.dueDate?.toISOString() ?? null,
+			to: data.dueDate?.toISOString() ?? null,
+		});
+	}
+
+	if (currentTask.task.assigneeId !== (data.assigneeId ?? null)) {
+		fieldChanges.push({
+			field: "assignee",
+			from: currentTask.task.assigneeId
+				? (assigneeNames.get(currentTask.task.assigneeId) ?? "Unknown member")
+				: null,
+			to: data.assigneeId
+				? (assigneeNames.get(data.assigneeId) ?? "Unknown member")
+				: null,
+		});
+	}
+
+	if (currentLabelNames !== nextLabelNames) {
+		fieldChanges.push({
+			field: "labels",
+			from: currentLabelNames || null,
+			to: nextLabelNames || null,
+		});
+	}
+
 	let targetPosition = currentTask.task.position;
 
 	if (data.listId !== currentTask.task.listId) {
@@ -201,6 +334,30 @@ export async function updateTask(
 
 	await syncTaskLabels(taskId, data.labelIds);
 	await touchProject(currentTask.projectId);
+
+	for (const change of fieldChanges) {
+		await recordTaskActivity({
+			projectId: currentTask.projectId,
+			taskId,
+			actorId: userId,
+			action: "task_field_changed",
+			metadata: change,
+		});
+	}
+
+	if (data.listId !== currentTask.task.listId) {
+		await recordTaskActivity({
+			projectId: currentTask.projectId,
+			taskId,
+			actorId: userId,
+			action: "task_moved",
+			metadata: {
+				title: task.title,
+				fromListName: currentTask.listName,
+				toListName: targetList.name,
+			},
+		});
+	}
 	return task;
 }
 
@@ -229,10 +386,11 @@ export async function saveBoardLayout(
 			);
 
 			const projectLists = await tx
-				.select({ id: lists.id })
+				.select({ id: lists.id, name: lists.name })
 				.from(lists)
 				.where(eq(lists.projectId, projectId));
 			const validListIds = new Set(projectLists.map(({ id }) => id));
+			const listNames = new Map(projectLists.map(({ id, name }) => [id, name]));
 			const submittedListIds = layout.map(({ id }) => id);
 
 			if (
@@ -246,11 +404,17 @@ export async function saveBoardLayout(
 			}
 
 			const projectTasks = await tx
-				.select({ id: tasks.id })
+				.select({
+					id: tasks.id,
+					listId: tasks.listId,
+					position: tasks.position,
+					title: tasks.title,
+				})
 				.from(tasks)
 				.innerJoin(lists, eq(tasks.listId, lists.id))
 				.where(and(eq(lists.projectId, projectId), isNull(tasks.deletedAt)));
 			const validTaskIds = new Set(projectTasks.map(({ id }) => id));
+			const currentTasks = new Map(projectTasks.map((task) => [task.id, task]));
 			const submittedTaskIds = layout.flatMap(({ taskIds }) => taskIds);
 
 			if (
@@ -281,6 +445,44 @@ export async function saveBoardLayout(
 						updatedAt: new Date(),
 					})
 					.where(and(inArray(tasks.id, list.taskIds), isNull(tasks.deletedAt)));
+			}
+
+			const activityValues = layout.flatMap((list) =>
+				list.taskIds.flatMap((taskId, position) => {
+					const current = currentTasks.get(taskId);
+
+					if (
+						!current ||
+						(current.listId === list.id && current.position === position)
+					) {
+						return [];
+					}
+
+					return [
+						{
+							projectId,
+							taskId,
+							actorId: userId,
+							action:
+								current.listId === list.id ? "task_reordered" : "task_moved",
+							metadata: {
+								title: current.title,
+								fromListName:
+									current.listId === list.id
+										? null
+										: (listNames.get(current.listId) ?? "Unknown column"),
+								toListName:
+									current.listId === list.id
+										? null
+										: (listNames.get(list.id) ?? "Unknown column"),
+							},
+						},
+					];
+				}),
+			);
+
+			if (activityValues.length > 0) {
+				await tx.insert(activityLogs).values(activityValues);
 			}
 
 			await tx

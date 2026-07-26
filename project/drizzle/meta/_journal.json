@@ -29,6 +29,13 @@
       "when": 1785056207736,
       "tag": "20260726085647_create_project_task_labels_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785058599658,
+      "tag": "20260726093639_create_task_activity_logs_table",
+      "breakpoints": true
     }
   ]
 }

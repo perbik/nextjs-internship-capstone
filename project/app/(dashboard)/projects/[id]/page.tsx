@@ -65,6 +65,20 @@ export default async function ProjectPage({
 		...list,
 		tasks: list.tasks.map((task) => ({
 			...task,
+			comments: task.comments.map(({ author, ...comment }) => ({
+				...comment,
+				authorName:
+					[author.firstName, author.lastName].filter(Boolean).join(" ") ||
+					author.email,
+				isOwn: author.id === user.id,
+			})),
+			activities: task.activities.map(({ actor, ...activity }) => ({
+				...activity,
+				actorName: actor
+					? [actor.firstName, actor.lastName].filter(Boolean).join(" ") ||
+						actor.email
+					: "Former member",
+			})),
 			labels: task.taskLabels.map(({ label }) => ({
 				id: label.id,
 				name: label.name,

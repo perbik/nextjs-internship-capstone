@@ -3,6 +3,7 @@ import {
 	boolean,
 	index,
 	integer,
+	jsonb,
 	pgEnum,
 	pgTable,
 	primaryKey,
@@ -203,11 +204,42 @@ export const comments = pgTable(
 	],
 );
 
+export const activityLogs = pgTable(
+	"activity_logs",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		projectId: uuid("project_id")
+			.notNull()
+			.references(() => projects.id, { onDelete: "cascade" }),
+		taskId: uuid("task_id").references(() => tasks.id, {
+			onDelete: "cascade",
+		}),
+		actorId: uuid("actor_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		action: text("action").notNull(),
+		metadata: jsonb("metadata")
+			.$type<Record<string, string | number | boolean | null>>()
+			.default({})
+			.notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		index("activity_logs_project_id_idx").on(table.projectId),
+		index("activity_logs_task_id_idx").on(table.taskId),
+		index("activity_logs_actor_id_idx").on(table.actorId),
+		index("activity_logs_created_at_idx").on(table.createdAt),
+	],
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
 	ownedProjects: many(projects),
 	projectMemberships: many(projectMembers),
 	assignedTasks: many(tasks),
 	comments: many(comments),
+	activities: many(activityLogs),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -218,6 +250,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
 	members: many(projectMembers),
 	lists: many(lists),
 	labels: many(labels),
+	activities: many(activityLogs),
 }));
 
 export const projectMembersRelations = relations(projectMembers, ({ one }) => ({
@@ -258,6 +291,7 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
 	}),
 	comments: many(comments),
 	taskLabels: many(taskLabels),
+	activities: many(activityLogs),
 }));
 
 export const taskLabelsRelations = relations(taskLabels, ({ one }) => ({
@@ -282,6 +316,21 @@ export const commentsRelations = relations(comments, ({ one }) => ({
 	}),
 }));
 
+export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
+	project: one(projects, {
+		fields: [activityLogs.projectId],
+		references: [projects.id],
+	}),
+	task: one(tasks, {
+		fields: [activityLogs.taskId],
+		references: [tasks.id],
+	}),
+	actor: one(users, {
+		fields: [activityLogs.actorId],
+		references: [users.id],
+	}),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Project = typeof projects.$inferSelect;
@@ -298,3 +347,5 @@ export type TaskLabel = typeof taskLabels.$inferSelect;
 export type NewTaskLabel = typeof taskLabels.$inferInsert;
 export type Comment = typeof comments.$inferSelect;
 export type NewComment = typeof comments.$inferInsert;
+export type ActivityLog = typeof activityLogs.$inferSelect;
+export type NewActivityLog = typeof activityLogs.$inferInsert;

@@ -9,6 +9,11 @@ import {
 	updateTaskAction,
 } from "@/app/(dashboard)/projects/[id]/task-actions";
 import type { TaskLabelOption } from "@/components/project-labels";
+import {
+	type TaskActivityItem,
+	type TaskCommentItem,
+	TaskDiscussion,
+} from "@/components/task-discussion";
 import { useUIStore } from "@/stores/ui-store";
 
 export interface TaskMemberOption {
@@ -31,6 +36,8 @@ export interface EditableTask {
 	dueDate: Date | null;
 	assigneeId: string | null;
 	labels: TaskLabelOption[];
+	comments: TaskCommentItem[];
+	activities: TaskActivityItem[];
 }
 
 interface TaskModalProps {
@@ -139,7 +146,7 @@ function TaskModal({
 							role="dialog"
 							aria-modal="true"
 							aria-labelledby="task-dialog-title"
-							className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-outer_space-500"
+							className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-outer_space-500"
 						>
 							<div className="mb-5 flex items-center justify-between">
 								<h2
@@ -307,6 +314,14 @@ function TaskModal({
 									</button>
 								</div>
 							</form>
+							{task && (
+								<TaskDiscussion
+									projectId={projectId}
+									taskId={task.id}
+									comments={task.comments}
+									activities={task.activities}
+								/>
+							)}
 						</div>
 					</div>,
 					document.body,

@@ -20,6 +20,21 @@ export interface BoardTask {
 		name: string;
 		color: string;
 	}>;
+	comments: Array<{
+		id: string;
+		content: string;
+		createdAt: Date;
+		updatedAt: Date;
+		authorName: string;
+		isOwn: boolean;
+	}>;
+	activities: Array<{
+		id: string;
+		action: string;
+		createdAt: Date;
+		actorName: string;
+		metadata: Record<string, string | number | boolean | null>;
+	}>;
 }
 
 export interface BoardList {

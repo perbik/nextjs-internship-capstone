@@ -14,7 +14,7 @@ import {
 	Plus,
 	Trash2,
 } from "lucide-react";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import {
 	createListAction,
@@ -29,7 +29,11 @@ import {
 	type TaskMemberOption,
 } from "@/components/modals/create-task-modal";
 import { TaskCard, type TaskDragData } from "@/components/task-card";
-import { type BoardList, useBoardStore } from "@/stores/board-store";
+import {
+	type BoardList,
+	type BoardMove,
+	useBoardStore,
+} from "@/stores/board-store";
 
 interface KanbanBoardProps {
 	projectId: string;
@@ -66,14 +70,14 @@ export function KanbanBoard({
 		syncBoard,
 		startDragging,
 		stopDragging,
-		moveTask,
-		startSavingMove,
-		finishSavingMove,
-		restoreBoard,
+		queueMove,
+		confirmMove,
+		rejectMove,
 		clearMoveError,
 	} = useBoardStore();
+	const moveRequestQueue = useRef(Promise.resolve());
 	const boardLists = storedProjectId === projectId ? storedLists : lists;
-	const isMoving = pendingMoves > 0;
+	const isMoving = pendingMoves.length > 0;
 
 	useEffect(() => {
 		syncBoard(projectId, lists);
@@ -118,36 +122,40 @@ export function KanbanBoard({
 			return;
 		}
 
-		moveTask(task.taskId, initialListId, targetListId, targetPosition);
+		const move: BoardMove = {
+			id: crypto.randomUUID(),
+			taskId: task.taskId,
+			sourceListId: initialListId,
+			targetListId,
+			targetPosition,
+		};
+
+		queueMove(move);
 		clearMoveError();
-		startSavingMove();
-		void persistTaskMove(task.taskId, targetListId, targetPosition);
+		moveRequestQueue.current = moveRequestQueue.current.then(() =>
+			persistTaskMove(move),
+		);
 	}
 
-	async function persistTaskMove(
-		taskId: string,
-		targetListId: string,
-		targetPosition: number,
-	) {
+	async function persistTaskMove(move: BoardMove) {
 		try {
 			const result = await moveTaskAction({
 				projectId,
-				taskId,
-				targetListId,
-				targetPosition,
+				taskId: move.taskId,
+				targetListId: move.targetListId,
+				targetPosition: move.targetPosition,
 			});
 
-			if (!result.success) {
-				restoreBoard(projectId, lists, result.message);
+			if (result.success) {
+				confirmMove(move.id);
+			} else {
+				rejectMove(move.id, result.message);
 			}
 		} catch {
-			restoreBoard(
-				projectId,
-				lists,
+			rejectMove(
+				move.id,
 				"Unable to save the task position. Please try again.",
 			);
-		} finally {
-			finishSavingMove();
 		}
 	}
 

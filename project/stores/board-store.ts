@@ -25,36 +25,48 @@ export interface BoardList {
 	tasks: BoardTask[];
 }
 
+export interface BoardMove {
+	id: string;
+	taskId: string;
+	sourceListId: string;
+	targetListId: string;
+	targetPosition: number;
+}
+
 interface BoardState {
 	projectId: string | null;
 	lists: BoardList[];
+	confirmedLists: BoardList[];
 	isDragging: boolean;
-	pendingMoves: number;
+	pendingMoves: BoardMove[];
 	moveError: string;
 	syncBoard: (projectId: string, lists: BoardList[]) => void;
 	startDragging: () => void;
 	stopDragging: () => void;
-	moveTask: (
-		taskId: string,
-		sourceListId: string,
-		targetListId: string,
-		targetPosition: number,
-	) => void;
-	startSavingMove: () => void;
-	finishSavingMove: () => void;
-	restoreBoard: (projectId: string, lists: BoardList[], error: string) => void;
+	queueMove: (move: BoardMove) => void;
+	confirmMove: (moveId: string) => void;
+	rejectMove: (moveId: string, error: string) => void;
 	clearMoveError: () => void;
 }
 
-function moveTaskBetweenLists(
+export function moveTaskBetweenLists(
 	currentLists: BoardList[],
-	taskId: string,
-	sourceListId: string,
-	targetListId: string,
-	targetPosition: number,
+	move: Omit<BoardMove, "id">,
 ) {
-	const sourceList = currentLists.find((list) => list.id === sourceListId);
-	const task = sourceList?.tasks.find((item) => item.id === taskId);
+	const { taskId, sourceListId, targetListId, targetPosition } = move;
+	const sourceList =
+		currentLists.find(
+			(list) =>
+				list.id === sourceListId &&
+				list.tasks.some((item) => item.id === taskId),
+		) ??
+		currentLists.find((list) => list.tasks.some((item) => item.id === taskId));
+
+	if (!sourceList) {
+		return currentLists;
+	}
+
+	const task = sourceList.tasks.find((item) => item.id === taskId);
 
 	if (!task) {
 		return currentLists;
@@ -66,7 +78,7 @@ function moveTaskBetweenLists(
 		);
 
 		if (list.id !== targetListId) {
-			return list.id === sourceListId
+			return list.id === sourceList.id
 				? { ...list, tasks: tasksWithoutMovedTask }
 				: list;
 		}
@@ -79,23 +91,36 @@ function moveTaskBetweenLists(
 	});
 }
 
+function replayMoves(lists: BoardList[], moves: BoardMove[]) {
+	return moves.reduce(
+		(currentLists, move) => moveTaskBetweenLists(currentLists, move),
+		lists,
+	);
+}
+
 export const useBoardStore = create<BoardState>()((set) => ({
 	projectId: null,
 	lists: [],
+	confirmedLists: [],
 	isDragging: false,
-	pendingMoves: 0,
+	pendingMoves: [],
 	moveError: "",
 
 	syncBoard: (projectId, lists) =>
 		set((state) => {
-			if (state.projectId === projectId && state.isDragging) {
+			if (
+				state.projectId === projectId &&
+				(state.isDragging || state.pendingMoves.length > 0)
+			) {
 				return state;
 			}
 
 			return {
 				projectId,
 				lists,
+				confirmedLists: lists,
 				isDragging: false,
+				pendingMoves: [],
 				moveError: "",
 			};
 		}),
@@ -103,33 +128,48 @@ export const useBoardStore = create<BoardState>()((set) => ({
 	startDragging: () => set({ isDragging: true }),
 	stopDragging: () => set({ isDragging: false }),
 
-	moveTask: (taskId, sourceListId, targetListId, targetPosition) =>
+	queueMove: (move) =>
 		set((state) => ({
-			lists: moveTaskBetweenLists(
-				state.lists,
-				taskId,
-				sourceListId,
-				targetListId,
-				targetPosition,
-			),
+			lists: moveTaskBetweenLists(state.lists, move),
+			pendingMoves: [...state.pendingMoves, move],
 		})),
 
-	startSavingMove: () =>
-		set((state) => ({
-			pendingMoves: state.pendingMoves + 1,
-		})),
+	confirmMove: (moveId) =>
+		set((state) => {
+			const confirmedMove = state.pendingMoves.find(
+				(move) => move.id === moveId,
+			);
 
-	finishSavingMove: () =>
-		set((state) => ({
-			pendingMoves: Math.max(0, state.pendingMoves - 1),
-		})),
+			if (!confirmedMove) {
+				return state;
+			}
 
-	restoreBoard: (projectId, lists, error) =>
-		set({
-			projectId,
-			lists,
-			isDragging: false,
-			moveError: error,
+			const confirmedLists = moveTaskBetweenLists(
+				state.confirmedLists,
+				confirmedMove,
+			);
+			const pendingMoves = state.pendingMoves.filter(
+				(move) => move.id !== moveId,
+			);
+
+			return {
+				confirmedLists,
+				pendingMoves,
+				lists: replayMoves(confirmedLists, pendingMoves),
+			};
+		}),
+
+	rejectMove: (moveId, error) =>
+		set((state) => {
+			const pendingMoves = state.pendingMoves.filter(
+				(move) => move.id !== moveId,
+			);
+
+			return {
+				pendingMoves,
+				lists: replayMoves(state.confirmedLists, pendingMoves),
+				moveError: error,
+			};
 		}),
 
 	clearMoveError: () => set({ moveError: "" }),

@@ -1,125 +1,127 @@
-import { Mail, MoreHorizontal, UserPlus } from "lucide-react";
+import { FolderKanban, Mail, Users } from "lucide-react";
+import Link from "next/link";
+import { requireCurrentUser } from "@/lib/auth/current-user";
+import { getTeamOverview } from "@/lib/db/queries";
 
-export default function TeamPage() {
+function displayName(user: {
+	firstName: string | null;
+	lastName: string | null;
+	email: string;
+}) {
+	return (
+		[user.firstName, user.lastName].filter(Boolean).join(" ") || user.email
+	);
+}
+
+function initials(name: string) {
+	return name
+		.split(/\s+/)
+		.slice(0, 2)
+		.map((part) => part[0]?.toUpperCase())
+		.join("");
+}
+
+export default async function TeamPage() {
+	const currentUser = await requireCurrentUser();
+	const memberships = await getTeamOverview(currentUser.id);
+	const collaborators = new Map<
+		string,
+		{
+			user: (typeof memberships)[number]["user"];
+			projects: Array<{
+				id: string;
+				name: string;
+				role: "owner" | "admin" | "member";
+			}>;
+		}
+	>();
+
+	for (const membership of memberships) {
+		const collaborator = collaborators.get(membership.user.id) ?? {
+			user: membership.user,
+			projects: [],
+		};
+		collaborator.projects.push({
+			id: membership.projectId,
+			name: membership.projectName,
+			role: membership.role,
+		});
+		collaborators.set(membership.user.id, collaborator);
+	}
+
 	return (
 		<div className="space-y-6">
-			<div className="flex justify-between items-center">
-				<div>
-					<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
-						Team
-					</h1>
-					<p className="text-paynes_gray-500 dark:text-french_gray-500 mt-2">
-						Manage team members and permissions
+			<div>
+				<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
+					Team
+				</h1>
+				<p className="mt-2 text-paynes_gray-500 dark:text-french_gray-500">
+					People collaborating with you across accessible projects.
+				</p>
+			</div>
+
+			{collaborators.size === 0 ? (
+				<div className="rounded-xl border border-dashed border-french_gray-300 bg-white p-10 text-center dark:border-paynes_gray-400 dark:bg-outer_space-500">
+					<Users
+						size={30}
+						className="mx-auto text-blue_munsell-500"
+						aria-hidden="true"
+					/>
+					<p className="mt-3 text-sm text-paynes_gray-500 dark:text-french_gray-400">
+						No project collaborators yet.
 					</p>
 				</div>
-				<button
-					type="button"
-					className="inline-flex items-center px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors"
-				>
-					<UserPlus size={20} className="mr-2" />
-					Invite Member
-				</button>
-			</div>
+			) : (
+				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+					{Array.from(collaborators.values()).map(({ user, projects }) => {
+						const name = displayName(user);
 
-			{/* Implementation Tasks Banner */}
-			<div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-				<h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
-					📋 Team Management Implementation Tasks
-				</h3>
-				<ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
-					<li>
-						• Task 6.1: Implement task assignment and user collaboration
-						features
-					</li>
-					<li>
-						• Task 6.4: Implement project member management and permissions
-					</li>
-				</ul>
-			</div>
-
-			{/* Team Members Grid */}
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-				{[
-					{
-						name: "John Doe",
-						role: "Project Manager",
-						email: "john@example.com",
-						avatar: "JD",
-					},
-					{
-						name: "Jane Smith",
-						role: "Developer",
-						email: "jane@example.com",
-						avatar: "JS",
-					},
-					{
-						name: "Mike Johnson",
-						role: "Designer",
-						email: "mike@example.com",
-						avatar: "MJ",
-					},
-					{
-						name: "Sarah Wilson",
-						role: "Developer",
-						email: "sarah@example.com",
-						avatar: "SW",
-					},
-					{
-						name: "Tom Brown",
-						role: "QA Engineer",
-						email: "tom@example.com",
-						avatar: "TB",
-					},
-					{
-						name: "Lisa Davis",
-						role: "Designer",
-						email: "lisa@example.com",
-						avatar: "LD",
-					},
-				].map((member) => (
-					<div
-						key={member.email}
-						className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6"
-					>
-						<div className="flex items-start justify-between mb-4">
-							<div className="flex items-center space-x-3">
-								<div className="w-12 h-12 bg-blue_munsell-500 rounded-full flex items-center justify-center text-white font-semibold">
-									{member.avatar}
-								</div>
-								<div>
-									<h3 className="font-semibold text-outer_space-500 dark:text-platinum-500">
-										{member.name}
-									</h3>
-									<p className="text-sm text-paynes_gray-500 dark:text-french_gray-400">
-										{member.role}
-									</p>
-								</div>
-							</div>
-							<button
-								type="button"
-								aria-label={`More actions for ${member.name}`}
-								className="p-1 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded"
+						return (
+							<article
+								key={user.id}
+								className="rounded-xl border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500"
 							>
-								<MoreHorizontal size={16} />
-							</button>
-						</div>
+								<div className="flex items-center gap-3">
+									<div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-blue_munsell-500 font-semibold text-white">
+										{initials(name)}
+									</div>
+									<div className="min-w-0">
+										<h2 className="truncate font-semibold text-outer_space-500 dark:text-platinum-500">
+											{name}
+											{user.id === currentUser.id ? " (You)" : ""}
+										</h2>
+										<p className="flex items-center gap-1 truncate text-xs text-paynes_gray-500 dark:text-french_gray-400">
+											<Mail size={13} />
+											{user.email}
+										</p>
+									</div>
+								</div>
 
-						<div className="flex items-center text-sm text-paynes_gray-500 dark:text-french_gray-400 mb-4">
-							<Mail size={16} className="mr-2" />
-							{member.email}
-						</div>
-
-						<div className="flex items-center justify-between">
-							<span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-								Active
-							</span>
-							<div className="text-sm text-paynes_gray-500 dark:text-french_gray-400">
-								{Math.floor(Math.random() * 10) + 1} projects
-							</div>
-						</div>
-					</div>
-				))}
-			</div>
+								<div className="mt-4 space-y-2">
+									{projects.map((project) => (
+										<Link
+											key={project.id}
+											href={`/projects/${project.id}`}
+											className="flex items-center justify-between gap-2 rounded-lg bg-platinum-500/70 px-3 py-2 text-xs hover:bg-platinum-600 dark:bg-outer_space-400 dark:hover:bg-paynes_gray-400"
+										>
+											<span className="flex min-w-0 items-center gap-2">
+												<FolderKanban
+													size={14}
+													className="shrink-0 text-blue_munsell-500"
+												/>
+												<span className="truncate">{project.name}</span>
+											</span>
+											<span className="shrink-0 capitalize text-paynes_gray-500 dark:text-french_gray-400">
+												{project.role}
+											</span>
+										</Link>
+									))}
+								</div>
+							</article>
+						);
+					})}
+				</div>
+			)}
 		</div>
 	);
 }

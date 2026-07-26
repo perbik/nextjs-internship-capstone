@@ -6,6 +6,7 @@ import { KanbanBoard } from "@/components/kanban-board";
 import { ProjectActions } from "@/components/project-actions";
 import { ProjectCollaborators } from "@/components/project-collaborators";
 import { ProjectLabels } from "@/components/project-labels";
+import { ProjectMembersManager } from "@/components/project-members-manager";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { getProjectBoard } from "@/lib/db/queries";
 import { taskFilterSchema } from "@/lib/validations";
@@ -49,6 +50,7 @@ export default async function ProjectPage({
 		name:
 			[member.firstName, member.lastName].filter(Boolean).join(" ") ||
 			member.email,
+		email: member.email,
 		role,
 		isCurrentUser: member.id === user.id,
 	}));
@@ -122,6 +124,13 @@ export default async function ProjectPage({
 			</div>
 
 			<ProjectCollaborators members={members} />
+			{(membership?.role === "owner" || membership?.role === "admin") && (
+				<ProjectMembersManager
+					projectId={project.id}
+					members={members}
+					actorRole={membership.role}
+				/>
+			)}
 			<ProjectLabels
 				projectId={project.id}
 				labels={labels}

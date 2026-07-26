@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { projectMembers, projects, users } from "@/lib/db/schema";
 
@@ -64,5 +64,37 @@ export async function getProjectMembers(
 		.innerJoin(users, eq(projectMembers.userId, users.id))
 		.where(
 			and(eq(projectMembers.projectId, projectId), isNull(users.deletedAt)),
+		);
+}
+
+export async function getTeamOverview(userId: string) {
+	const accessibleProjects = await db
+		.select({ id: projects.id })
+		.from(projectMembers)
+		.innerJoin(projects, eq(projectMembers.projectId, projects.id))
+		.where(and(eq(projectMembers.userId, userId), isNull(projects.deletedAt)));
+
+	if (accessibleProjects.length === 0) {
+		return [];
+	}
+
+	return db
+		.select({
+			projectId: projects.id,
+			projectName: projects.name,
+			role: projectMembers.role,
+			user: users,
+		})
+		.from(projectMembers)
+		.innerJoin(projects, eq(projectMembers.projectId, projects.id))
+		.innerJoin(users, eq(projectMembers.userId, users.id))
+		.where(
+			and(
+				inArray(
+					projects.id,
+					accessibleProjects.map(({ id }) => id),
+				),
+				isNull(users.deletedAt),
+			),
 		);
 }

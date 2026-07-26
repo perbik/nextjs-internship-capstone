@@ -166,6 +166,27 @@ export const labelCreateSchema = labelSchema.extend({
 	projectId: z.uuid("Project must be a valid ID"),
 });
 
+export const projectMemberCreateSchema = z.object({
+	projectId: z.uuid("Project must be a valid ID"),
+	email: z.email("Enter a valid member email").trim().toLowerCase(),
+	role: z.enum(["admin", "member"], {
+		error: "Role must be admin or member",
+	}),
+});
+
+export const projectMemberUpdateSchema = z.object({
+	projectId: z.uuid("Project must be a valid ID"),
+	userId: z.uuid("Member must be a valid ID"),
+	role: z.enum(["admin", "member"], {
+		error: "Role must be admin or member",
+	}),
+});
+
+export const projectMemberRemoveSchema = z.object({
+	projectId: z.uuid("Project must be a valid ID"),
+	userId: z.uuid("Member must be a valid ID"),
+});
+
 export const commentSchema = z.object({
 	content: requiredText("Comment", 1000),
 });

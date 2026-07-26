@@ -4,14 +4,7 @@ import {
 	canAccessProject,
 	getProjectMembership,
 } from "@/lib/db/queries/project-members";
-import {
-	activityLogs,
-	comments,
-	labels,
-	lists,
-	projects,
-	tasks,
-} from "@/lib/db/schema";
+import { labels, lists, projects, tasks } from "@/lib/db/schema";
 import type { TaskFilters } from "@/lib/validations";
 
 export async function getProjectBoard(
@@ -57,14 +50,6 @@ export async function getProjectBoard(
 							orderBy: asc(tasks.position),
 							with: {
 								assignee: true,
-								comments: {
-									orderBy: asc(comments.createdAt),
-									with: { author: true },
-								},
-								activities: {
-									orderBy: asc(activityLogs.createdAt),
-									with: { actor: true },
-								},
 								taskLabels: {
 									with: { label: true },
 								},

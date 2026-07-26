@@ -9,11 +9,7 @@ import {
 	updateTaskAction,
 } from "@/app/(dashboard)/projects/[id]/task-actions";
 import type { TaskLabelOption } from "@/components/project-labels";
-import {
-	type TaskActivityItem,
-	type TaskCommentItem,
-	TaskDiscussion,
-} from "@/components/task-discussion";
+import { TaskDiscussion } from "@/components/task-discussion";
 import { useUIStore } from "@/stores/ui-store";
 
 export interface TaskMemberOption {
@@ -36,8 +32,6 @@ export interface EditableTask {
 	dueDate: Date | null;
 	assigneeId: string | null;
 	labels: TaskLabelOption[];
-	comments: TaskCommentItem[];
-	activities: TaskActivityItem[];
 }
 
 interface TaskModalProps {
@@ -315,12 +309,7 @@ function TaskModal({
 								</div>
 							</form>
 							{task && (
-								<TaskDiscussion
-									projectId={projectId}
-									taskId={task.id}
-									comments={task.comments}
-									activities={task.activities}
-								/>
+								<TaskDiscussion projectId={projectId} taskId={task.id} />
 							)}
 						</div>
 					</div>,

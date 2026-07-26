@@ -1,13 +1,21 @@
 "use client";
 
 import { Pencil, Trash2 } from "lucide-react";
-import { useActionState, useEffect, useRef, useState } from "react";
+import {
+	useActionState,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import {
 	type CommentActionState,
 	createCommentAction,
 	deleteCommentAction,
+	getTaskDiscussionAction,
 	updateCommentAction,
 } from "@/app/(dashboard)/projects/[id]/comment-actions";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export interface TaskCommentItem {
 	id: string;
@@ -27,32 +35,41 @@ export interface TaskActivityItem {
 }
 
 const initialState: CommentActionState = { message: "" };
+const discussionSkeletonSections = ["comments", "activity"];
 
 function CommentForm({
 	projectId,
 	taskId,
 	comment,
 	onCancel,
+	onSaved,
 }: {
 	projectId: string;
 	taskId: string;
 	comment?: TaskCommentItem;
 	onCancel?: () => void;
+	onSaved: () => void;
 }) {
 	const formRef = useRef<HTMLFormElement>(null);
+	const handledSuccess = useRef(false);
 	const [state, action, isPending] = useActionState(
 		comment ? updateCommentAction : createCommentAction,
 		initialState,
 	);
 
 	useEffect(() => {
-		if (!state.success) {
+		if (!state.success || handledSuccess.current) {
+			if (!state.success) {
+				handledSuccess.current = false;
+			}
 			return;
 		}
 
+		handledSuccess.current = true;
 		formRef.current?.reset();
 		onCancel?.();
-	}, [onCancel, state.success]);
+		onSaved();
+	}, [onCancel, onSaved, state.success]);
 
 	return (
 		<form ref={formRef} action={action} className="space-y-2">
@@ -97,6 +114,54 @@ function CommentForm({
 					{isPending ? "Saving..." : comment ? "Save" : "Comment"}
 				</button>
 			</div>
+		</form>
+	);
+}
+
+function DeleteCommentForm({
+	projectId,
+	comment,
+	onDeleted,
+}: {
+	projectId: string;
+	comment: TaskCommentItem;
+	onDeleted: () => void;
+}) {
+	const handledSuccess = useRef(false);
+	const [state, action, isPending] = useActionState(
+		deleteCommentAction,
+		initialState,
+	);
+
+	useEffect(() => {
+		if (!state.success || handledSuccess.current) {
+			if (!state.success) {
+				handledSuccess.current = false;
+			}
+			return;
+		}
+
+		handledSuccess.current = true;
+		onDeleted();
+	}, [onDeleted, state.success]);
+
+	return (
+		<form action={action}>
+			<input type="hidden" name="projectId" value={projectId} />
+			<input type="hidden" name="commentId" value={comment.id} />
+			<button
+				type="submit"
+				disabled={isPending}
+				aria-label={`Delete comment by ${comment.authorName}`}
+				className="rounded p-1 text-red-600 hover:bg-white disabled:opacity-50 dark:text-red-400 dark:hover:bg-paynes_gray-400"
+			>
+				<Trash2 size={13} />
+			</button>
+			{state.message && !state.success && (
+				<span className="sr-only" role="alert">
+					{state.message}
+				</span>
+			)}
 		</form>
 	);
 }
@@ -183,15 +248,73 @@ function activityDescription(activity: TaskActivityItem) {
 export function TaskDiscussion({
 	projectId,
 	taskId,
-	comments,
-	activities,
 }: {
 	projectId: string;
 	taskId: string;
-	comments: TaskCommentItem[];
-	activities: TaskActivityItem[];
 }) {
 	const [editingId, setEditingId] = useState<string | null>(null);
+	const [comments, setComments] = useState<TaskCommentItem[]>([]);
+	const [activities, setActivities] = useState<TaskActivityItem[]>([]);
+	const [limit, setLimit] = useState(50);
+	const [isLoading, setIsLoading] = useState(true);
+	const [error, setError] = useState("");
+	const refreshDiscussion = useCallback(async () => {
+		setIsLoading(true);
+		setError("");
+
+		try {
+			const result = await getTaskDiscussionAction(taskId);
+
+			if (!result.discussion) {
+				setError(result.message || "Unable to load task discussion");
+				return;
+			}
+
+			setComments(result.discussion.comments);
+			setActivities(result.discussion.activities);
+			setLimit(result.discussion.limit);
+		} catch {
+			setError("Unable to load task discussion");
+		} finally {
+			setIsLoading(false);
+		}
+	}, [taskId]);
+
+	useEffect(() => {
+		void refreshDiscussion();
+	}, [refreshDiscussion]);
+
+	if (isLoading) {
+		return (
+			<div className="mt-6 grid gap-6 border-t border-french_gray-300 pt-5 dark:border-paynes_gray-400 md:grid-cols-2">
+				{discussionSkeletonSections.map((section) => (
+					<div key={section} className="space-y-3">
+						<Skeleton className="h-5 w-28" />
+						<Skeleton className="h-16 w-full" />
+						<Skeleton className="h-16 w-full" />
+						<Skeleton className="h-20 w-full" />
+					</div>
+				))}
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div className="mt-6 border-t border-french_gray-300 pt-5 dark:border-paynes_gray-400">
+				<p className="text-sm text-red-600 dark:text-red-400" role="alert">
+					{error}
+				</p>
+				<button
+					type="button"
+					onClick={() => void refreshDiscussion()}
+					className="mt-2 text-xs text-blue_munsell-600 hover:underline dark:text-blue_munsell-300"
+				>
+					Try again
+				</button>
+			</div>
+		);
+	}
 
 	return (
 		<div className="mt-6 grid gap-6 border-t border-french_gray-300 pt-5 dark:border-paynes_gray-400 md:grid-cols-2">
@@ -216,6 +339,7 @@ export function TaskDiscussion({
 									taskId={taskId}
 									comment={comment}
 									onCancel={() => setEditingId(null)}
+									onSaved={refreshDiscussion}
 								/>
 							) : (
 								<>
@@ -241,25 +365,11 @@ export function TaskDiscussion({
 												>
 													<Pencil size={13} />
 												</button>
-												<form action={deleteCommentAction}>
-													<input
-														type="hidden"
-														name="projectId"
-														value={projectId}
-													/>
-													<input
-														type="hidden"
-														name="commentId"
-														value={comment.id}
-													/>
-													<button
-														type="submit"
-														aria-label="Delete comment"
-														className="rounded p-1 text-red-600 hover:bg-white dark:text-red-400 dark:hover:bg-paynes_gray-400"
-													>
-														<Trash2 size={13} />
-													</button>
-												</form>
+												<DeleteCommentForm
+													projectId={projectId}
+													comment={comment}
+													onDeleted={refreshDiscussion}
+												/>
 											</div>
 										)}
 									</div>
@@ -271,7 +381,16 @@ export function TaskDiscussion({
 						</article>
 					))}
 				</div>
-				<CommentForm projectId={projectId} taskId={taskId} />
+				<CommentForm
+					projectId={projectId}
+					taskId={taskId}
+					onSaved={refreshDiscussion}
+				/>
+				{comments.length >= limit && (
+					<p className="mt-2 text-[10px] text-paynes_gray-500 dark:text-french_gray-400">
+						Showing the {limit} most recent comments.
+					</p>
+				)}
 			</section>
 
 			<section>
@@ -284,25 +403,27 @@ export function TaskDiscussion({
 							No recorded activity yet.
 						</p>
 					)}
-					{activities
-						.slice()
-						.reverse()
-						.map((activity) => (
-							<div key={activity.id} className="flex gap-2 text-xs">
-								<span className="mt-1 size-2 shrink-0 rounded-full bg-blue_munsell-500" />
-								<p className="text-paynes_gray-500 dark:text-french_gray-400">
-									<span className="font-medium text-outer_space-500 dark:text-platinum-500">
-										{activity.actorName}
-									</span>{" "}
-									{activityDescription(activity)}
-									<br />
-									<span className="text-[10px]">
-										{new Date(activity.createdAt).toLocaleString()}
-									</span>
-								</p>
-							</div>
-						))}
+					{activities.map((activity) => (
+						<div key={activity.id} className="flex gap-2 text-xs">
+							<span className="mt-1 size-2 shrink-0 rounded-full bg-blue_munsell-500" />
+							<p className="text-paynes_gray-500 dark:text-french_gray-400">
+								<span className="font-medium text-outer_space-500 dark:text-platinum-500">
+									{activity.actorName}
+								</span>{" "}
+								{activityDescription(activity)}
+								<br />
+								<span className="text-[10px]">
+									{new Date(activity.createdAt).toLocaleString()}
+								</span>
+							</p>
+						</div>
+					))}
 				</div>
+				{activities.length >= limit && (
+					<p className="mt-2 text-[10px] text-paynes_gray-500 dark:text-french_gray-400">
+						Showing the {limit} most recent activity entries.
+					</p>
+				)}
 			</section>
 		</div>
 	);

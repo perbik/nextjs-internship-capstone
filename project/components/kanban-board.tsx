@@ -14,13 +14,7 @@ import {
 	Plus,
 	Trash2,
 } from "lucide-react";
-import {
-	useActionState,
-	useEffect,
-	useRef,
-	useState,
-	useTransition,
-} from "react";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import {
 	createListAction,
@@ -35,29 +29,7 @@ import {
 	type TaskMemberOption,
 } from "@/components/modals/create-task-modal";
 import { TaskCard, type TaskDragData } from "@/components/task-card";
-
-interface BoardTask {
-	id: string;
-	listId: string;
-	title: string;
-	description: string | null;
-	priority: "low" | "medium" | "high";
-	dueDate: Date | null;
-	assigneeId: string | null;
-	assignee: {
-		firstName: string | null;
-		lastName: string | null;
-		email: string;
-	} | null;
-}
-
-interface BoardList {
-	id: string;
-	name: string;
-	position: number;
-	isCompleted: boolean;
-	tasks: BoardTask[];
-}
+import { type BoardList, useBoardStore } from "@/stores/board-store";
 
 interface KanbanBoardProps {
 	projectId: string;
@@ -86,19 +58,29 @@ export function KanbanBoard({
 		createListAction,
 		initialState,
 	);
-	const [boardLists, setBoardLists] = useState(lists);
-	const [moveError, setMoveError] = useState("");
-	const [isMoving, startMoveTransition] = useTransition();
-	const isDragging = useRef(false);
+	const {
+		projectId: storedProjectId,
+		lists: storedLists,
+		pendingMoves,
+		moveError,
+		syncBoard,
+		startDragging,
+		stopDragging,
+		moveTask,
+		startSavingMove,
+		finishSavingMove,
+		restoreBoard,
+		clearMoveError,
+	} = useBoardStore();
+	const boardLists = storedProjectId === projectId ? storedLists : lists;
+	const isMoving = pendingMoves > 0;
 
 	useEffect(() => {
-		if (!isDragging.current) {
-			setBoardLists(lists);
-		}
-	}, [lists]);
+		syncBoard(projectId, lists);
+	}, [lists, projectId, syncBoard]);
 
 	function handleDragEnd(event: DragEndEvent) {
-		isDragging.current = false;
+		stopDragging();
 
 		if (event.canceled || !dragEnabled) {
 			return;
@@ -119,13 +101,13 @@ export function KanbanBoard({
 			| TaskDragData
 			| ColumnDropData
 			| undefined;
-		const droppedOnColumn = dropTarget?.kind === "column";
-		const targetListId = droppedOnColumn
-			? dropTarget.listId
-			: typeof source.group === "string"
-				? source.group
-				: task.listId;
-		const targetPosition = droppedOnColumn ? dropTarget.index : source.index;
+
+		if (!dropTarget) {
+			return;
+		}
+
+		const targetListId = dropTarget.listId;
+		const targetPosition = dropTarget.index;
 		const initialListId =
 			typeof source.initialGroup === "string"
 				? source.initialGroup
@@ -136,36 +118,43 @@ export function KanbanBoard({
 			return;
 		}
 
-		setBoardLists((currentLists) =>
-			moveBoardTask(
-				currentLists,
-				task.taskId,
-				initialListId,
-				targetListId,
-				targetPosition,
-			),
-		);
-		setMoveError("");
-		startMoveTransition(async () => {
+		moveTask(task.taskId, initialListId, targetListId, targetPosition);
+		clearMoveError();
+		startSavingMove();
+		void persistTaskMove(task.taskId, targetListId, targetPosition);
+	}
+
+	async function persistTaskMove(
+		taskId: string,
+		targetListId: string,
+		targetPosition: number,
+	) {
+		try {
 			const result = await moveTaskAction({
 				projectId,
-				taskId: task.taskId,
+				taskId,
 				targetListId,
 				targetPosition,
 			});
 
 			if (!result.success) {
-				setBoardLists(lists);
-				setMoveError(result.message);
+				restoreBoard(projectId, lists, result.message);
 			}
-		});
+		} catch {
+			restoreBoard(
+				projectId,
+				lists,
+				"Unable to save the task position. Please try again.",
+			);
+		} finally {
+			finishSavingMove();
+		}
 	}
 
 	return (
 		<DragDropProvider
-			onDragStart={() => {
-				isDragging.current = true;
-			}}
+			onDragStart={startDragging}
+			onDragOver={(event) => event.preventDefault()}
 			onDragEnd={handleDragEnd}
 		>
 			<div className="overflow-hidden rounded-lg border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
@@ -198,7 +187,7 @@ export function KanbanBoard({
 							dragDisabled={!dragEnabled}
 							canManage={canManage}
 							canMoveLeft={index > 0}
-							canMoveRight={index < lists.length - 1}
+							canMoveRight={index < boardLists.length - 1}
 						/>
 					))}
 
@@ -256,39 +245,6 @@ export function KanbanBoard({
 			</div>
 		</DragDropProvider>
 	);
-}
-
-function moveBoardTask(
-	currentLists: BoardList[],
-	taskId: string,
-	sourceListId: string,
-	targetListId: string,
-	targetPosition: number,
-) {
-	const sourceList = currentLists.find((list) => list.id === sourceListId);
-	const task = sourceList?.tasks.find((item) => item.id === taskId);
-
-	if (!task) {
-		return currentLists;
-	}
-
-	return currentLists.map((list) => {
-		const tasksWithoutMovedTask = list.tasks.filter(
-			(item) => item.id !== taskId,
-		);
-
-		if (list.id !== targetListId) {
-			return list.id === sourceListId
-				? { ...list, tasks: tasksWithoutMovedTask }
-				: list;
-		}
-
-		const nextTasks = [...tasksWithoutMovedTask];
-		const nextPosition = Math.min(targetPosition, nextTasks.length);
-		nextTasks.splice(nextPosition, 0, { ...task, listId: targetListId });
-
-		return { ...list, tasks: nextTasks };
-	});
 }
 
 function ListColumn({

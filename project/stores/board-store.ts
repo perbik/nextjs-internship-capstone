@@ -1,72 +1,136 @@
-// TODO: Task 5.3 - Set up client-side state management with Zustand
-// TODO: Task 5.4 - Implement optimistic UI updates for smooth interactions
+"use client";
 
-/*
-TODO: Implementation Notes for Interns:
+import { create } from "zustand";
 
-Board state management for Kanban functionality:
-- Current project data
-- Lists/columns
-- Tasks
-- Drag and drop state
-- Optimistic updates
-- Sync with server
-
-Key features:
-- Optimistic task creation/updates
-- Drag and drop state management
-- Real-time synchronization
-- Conflict resolution
-- Offline support (optional)
-
-Example structure:
-import { create } from 'zustand'
-import { subscribeWithSelector } from 'zustand/middleware'
-
-interface BoardState {
-  // Data
-  currentProject: Project | null
-  lists: List[]
-  tasks: Task[]
-  
-  // UI state
-  draggedTask: Task | null
-  draggedOverList: string | null
-  
-  // Loading states
-  isLoading: boolean
-  isSaving: boolean
-  
-  // Actions
-  loadProject: (projectId: string) => Promise<void>
-  createTask: (listId: string, task: Partial<Task>) => Promise<void>
-  updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>
-  moveTask: (taskId: string, newListId: string, newPosition: number) => Promise<void>
-  deleteTask: (taskId: string) => Promise<void>
-  
-  // Drag and drop
-  setDraggedTask: (task: Task | null) => void
-  setDraggedOverList: (listId: string | null) => void
+export interface BoardTask {
+	id: string;
+	listId: string;
+	title: string;
+	description: string | null;
+	priority: "low" | "medium" | "high";
+	dueDate: Date | null;
+	assigneeId: string | null;
+	assignee: {
+		firstName: string | null;
+		lastName: string | null;
+		email: string;
+	} | null;
 }
 
-export const useBoardStore = create<BoardState>()(
-  subscribeWithSelector((set, get) => ({
-    // ... implementation
-  }))
-)
-*/
+export interface BoardList {
+	id: string;
+	name: string;
+	position: number;
+	isCompleted: boolean;
+	tasks: BoardTask[];
+}
 
-// Placeholder to prevent import errors
-export const useBoardStore = () => {
-	console.log("TODO: Implement board store with Zustand");
-	return {
-		currentProject: null,
-		lists: [],
-		tasks: [],
-		isLoading: false,
-		loadProject: (projectId: string) =>
-			console.log(`TODO: Load project ${projectId}`),
-		createTask: (listId: string, task: unknown) =>
-			console.log(`TODO: Create task in list ${listId}`, task),
-	};
-};
+interface BoardState {
+	projectId: string | null;
+	lists: BoardList[];
+	isDragging: boolean;
+	pendingMoves: number;
+	moveError: string;
+	syncBoard: (projectId: string, lists: BoardList[]) => void;
+	startDragging: () => void;
+	stopDragging: () => void;
+	moveTask: (
+		taskId: string,
+		sourceListId: string,
+		targetListId: string,
+		targetPosition: number,
+	) => void;
+	startSavingMove: () => void;
+	finishSavingMove: () => void;
+	restoreBoard: (projectId: string, lists: BoardList[], error: string) => void;
+	clearMoveError: () => void;
+}
+
+function moveTaskBetweenLists(
+	currentLists: BoardList[],
+	taskId: string,
+	sourceListId: string,
+	targetListId: string,
+	targetPosition: number,
+) {
+	const sourceList = currentLists.find((list) => list.id === sourceListId);
+	const task = sourceList?.tasks.find((item) => item.id === taskId);
+
+	if (!task) {
+		return currentLists;
+	}
+
+	return currentLists.map((list) => {
+		const tasksWithoutMovedTask = list.tasks.filter(
+			(item) => item.id !== taskId,
+		);
+
+		if (list.id !== targetListId) {
+			return list.id === sourceListId
+				? { ...list, tasks: tasksWithoutMovedTask }
+				: list;
+		}
+
+		const nextTasks = [...tasksWithoutMovedTask];
+		const nextPosition = Math.min(targetPosition, nextTasks.length);
+		nextTasks.splice(nextPosition, 0, { ...task, listId: targetListId });
+
+		return { ...list, tasks: nextTasks };
+	});
+}
+
+export const useBoardStore = create<BoardState>()((set) => ({
+	projectId: null,
+	lists: [],
+	isDragging: false,
+	pendingMoves: 0,
+	moveError: "",
+
+	syncBoard: (projectId, lists) =>
+		set((state) => {
+			if (state.projectId === projectId && state.isDragging) {
+				return state;
+			}
+
+			return {
+				projectId,
+				lists,
+				isDragging: false,
+				moveError: "",
+			};
+		}),
+
+	startDragging: () => set({ isDragging: true }),
+	stopDragging: () => set({ isDragging: false }),
+
+	moveTask: (taskId, sourceListId, targetListId, targetPosition) =>
+		set((state) => ({
+			lists: moveTaskBetweenLists(
+				state.lists,
+				taskId,
+				sourceListId,
+				targetListId,
+				targetPosition,
+			),
+		})),
+
+	startSavingMove: () =>
+		set((state) => ({
+			pendingMoves: state.pendingMoves + 1,
+		})),
+
+	finishSavingMove: () =>
+		set((state) => ({
+			pendingMoves: Math.max(0, state.pendingMoves - 1),
+		})),
+
+	restoreBoard: (projectId, lists, error) =>
+		set({
+			projectId,
+			lists,
+			isDragging: false,
+			moveError: error,
+		}),
+
+	clearMoveError: () => set({ moveError: "" }),
+}));

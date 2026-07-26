@@ -1,4 +1,6 @@
+export * from "./analytics";
 export * from "./board";
+export * from "./calendar";
 export * from "./comments";
 export * from "./dashboard";
 export * from "./lists";

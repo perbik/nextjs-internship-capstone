@@ -1,9 +1,4 @@
-import {
-	CheckCircle,
-	ClipboardCheck,
-	FolderKanban,
-	ListTodo,
-} from "lucide-react";
+import { CheckCircle, FolderKanban, ListTodo, Users } from "lucide-react";
 import Link from "next/link";
 import { CreateProjectModal } from "@/components/modals/create-project-modal";
 import { requireCurrentUser } from "@/lib/auth/current-user";
@@ -29,20 +24,24 @@ export default async function DashboardPage() {
 	const { stats, recentProjects } = await getDashboardData(user.id);
 	const statCards = [
 		{
-			name: "Active Projects",
-			value: stats.activeProjects,
-			icon: FolderKanban,
+			name: "Pending Tasks",
+			value: stats.pendingTasks,
+			icon: ListTodo,
 		},
 		{
-			name: "Completed Projects",
-			value: stats.completedProjects,
-			icon: CheckCircle,
+			name: "Team Members",
+			value: stats.teamMembers,
+			icon: Users,
 		},
-		{ name: "Total Tasks", value: stats.totalTasks, icon: ListTodo },
 		{
 			name: "Completed Tasks",
 			value: stats.completedTasks,
-			icon: ClipboardCheck,
+			icon: CheckCircle,
+		},
+		{
+			name: "Active Projects",
+			value: stats.activeProjects,
+			icon: FolderKanban,
 		},
 	];
 

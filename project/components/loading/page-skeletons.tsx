@@ -9,6 +9,9 @@ const boardColumns = [
 	{ id: "done", tasks: ["one", "two", "three"] },
 ];
 const teamCards = ["one", "two", "three", "four", "five", "six"];
+const analyticsDistributions = ["priority", "status"];
+const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const calendarDays = Array.from({ length: 42 }, (_, index) => index);
 
 function PageHeadingSkeleton() {
 	return (
@@ -50,19 +53,140 @@ export function DashboardSkeleton() {
 				{dashboardStats.map((stat) => (
 					<div
 						key={stat}
-						className="space-y-4 rounded-xl border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500"
+						className="flex items-center gap-4 rounded-lg border border-french_gray-300 bg-white p-6 dark:border-paynes_gray-400 dark:bg-outer_space-500"
+					>
+						<Skeleton className="size-10 rounded-lg" />
+						<div className="space-y-2">
+							<Skeleton className="h-4 w-28" />
+							<Skeleton className="h-7 w-16" />
+						</div>
+					</div>
+				))}
+			</div>
+			<div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+				<div className="space-y-4 rounded-lg border border-french_gray-300 bg-white p-6 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+					<Skeleton className="h-6 w-36" />
+					{dashboardRows.slice(0, 3).map((row) => (
+						<Skeleton key={row} className="h-24 w-full rounded-lg" />
+					))}
+				</div>
+				<div className="space-y-5 rounded-lg border border-french_gray-300 bg-white p-6 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+					<Skeleton className="h-6 w-32" />
+					<Skeleton className="h-4 w-full" />
+					<Skeleton className="h-10 w-36" />
+					<Skeleton className="h-10 w-36" />
+				</div>
+			</div>
+		</div>
+	);
+}
+
+export function AnalyticsSkeleton() {
+	return (
+		<div
+			className="space-y-6"
+			role="status"
+			aria-label="Loading analytics"
+			aria-busy="true"
+		>
+			<PageHeadingSkeleton />
+			<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+				{dashboardStats.map((stat) => (
+					<div
+						key={stat}
+						className="space-y-3 rounded-xl border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500"
 					>
 						<Skeleton className="size-10 rounded-lg" />
 						<Skeleton className="h-7 w-16" />
 						<Skeleton className="h-4 w-28" />
+						<Skeleton className="h-3 w-32" />
 					</div>
 				))}
 			</div>
-			<div className="space-y-4 rounded-xl border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
-				<Skeleton className="h-6 w-36" />
-				{dashboardRows.map((row) => (
-					<Skeleton key={row} className="h-16 w-full" />
+			<div className="grid gap-6 lg:grid-cols-2">
+				{analyticsDistributions.map((distribution) => (
+					<div
+						key={distribution}
+						className="space-y-5 rounded-xl border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500"
+					>
+						<Skeleton className="h-6 w-40" />
+						{dashboardRows.slice(0, 3).map((row) => (
+							<div key={row} className="space-y-2">
+								<Skeleton className="h-4 w-full" />
+								<Skeleton className="h-2.5 w-full rounded-full" />
+							</div>
+						))}
+					</div>
 				))}
+			</div>
+			<div className="grid gap-6 lg:grid-cols-2">
+				<Skeleton className="h-80 w-full rounded-xl" />
+				<Skeleton className="h-80 w-full rounded-xl" />
+			</div>
+		</div>
+	);
+}
+
+export function CalendarSkeleton() {
+	return (
+		<div
+			className="space-y-6"
+			role="status"
+			aria-label="Loading calendar"
+			aria-busy="true"
+		>
+			<PageHeadingSkeleton />
+			<div className="overflow-hidden rounded-xl border border-french_gray-300 bg-white dark:border-paynes_gray-400 dark:bg-outer_space-500">
+				<div className="flex items-center justify-between border-b border-french_gray-300 p-4 dark:border-paynes_gray-400">
+					<Skeleton className="h-10 w-64 max-w-[70%]" />
+					<Skeleton className="h-9 w-16" />
+				</div>
+				<div className="grid grid-cols-7 gap-px border-b border-french_gray-300 p-2 dark:border-paynes_gray-400">
+					{weekdayLabels.map((weekday) => (
+						<Skeleton key={weekday} className="mx-auto h-4 w-8" />
+					))}
+				</div>
+				<div className="grid grid-cols-7">
+					{calendarDays.map((day) => (
+						<div
+							key={day}
+							className="min-h-28 border-r border-b border-french_gray-300 p-2 sm:min-h-32 dark:border-paynes_gray-400"
+						>
+							<Skeleton className="size-7 rounded-full" />
+							{day % 4 === 0 && (
+								<Skeleton className="mt-2 h-6 w-full rounded" />
+							)}
+						</div>
+					))}
+				</div>
+			</div>
+			<div className="space-y-4 rounded-xl border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+				<Skeleton className="h-6 w-56" />
+				<div className="grid gap-2 md:grid-cols-2">
+					{dashboardRows.map((row) => (
+						<Skeleton key={row} className="h-16 w-full rounded-lg" />
+					))}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+export function SettingsSkeleton() {
+	return (
+		<div
+			className="space-y-6"
+			role="status"
+			aria-label="Loading settings"
+			aria-busy="true"
+		>
+			<PageHeadingSkeleton />
+			<div className="grid gap-6 xl:grid-cols-[minmax(18rem,0.7fr)_minmax(36rem,1.3fr)]">
+				<div className="space-y-6">
+					<Skeleton className="h-44 w-full rounded-xl" />
+					<Skeleton className="h-36 w-full rounded-xl" />
+				</div>
+				<Skeleton className="h-[38rem] w-full rounded-xl" />
 			</div>
 		</div>
 	);

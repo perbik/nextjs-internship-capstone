@@ -167,6 +167,16 @@ function activityDescription(activity: TaskActivityItem) {
 		}
 	}
 
+	if (
+		(activity.action === "task_label_added" ||
+			activity.action === "task_label_removed") &&
+		typeof activity.metadata.labelName === "string"
+	) {
+		return `${
+			activity.action === "task_label_added" ? "added" : "removed"
+		} the ${activity.metadata.labelName} label`;
+	}
+
 	return activityLabels[activity.action] ?? activity.action;
 }
 

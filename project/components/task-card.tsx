@@ -24,6 +24,9 @@ interface TaskCardProps {
 	lists: TaskListOption[];
 	members: TaskMemberOption[];
 	labels: TaskLabelOption[];
+	bulkMode: boolean;
+	selected: boolean;
+	onToggleSelection: () => void;
 }
 
 export interface TaskDragData {
@@ -48,6 +51,9 @@ export function TaskCard({
 	lists,
 	members,
 	labels,
+	bulkMode,
+	selected,
+	onToggleSelection,
 }: TaskCardProps) {
 	const {
 		attributes,
@@ -90,14 +96,29 @@ export function TaskCard({
 			{...attributes}
 			{...listeners}
 			tabIndex={dragDisabled ? -1 : 0}
-			aria-label={`${task.title}. Drag to reorder or move to another column.`}
+			aria-label={
+				bulkMode
+					? `${task.title}. ${selected ? "Selected" : "Not selected"}.`
+					: `${task.title}. Drag to reorder or move to another column.`
+			}
 			className={`touch-pan-y rounded-lg border border-french_gray-300 bg-white p-3 transition-[opacity,box-shadow,border-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-300 ${
-				dragDisabled
-					? "cursor-default"
-					: "cursor-grab hover:border-blue_munsell-400 hover:shadow-md active:cursor-grabbing"
-			} ${isDragging ? "opacity-40" : ""}`}
+				bulkMode
+					? "cursor-pointer"
+					: dragDisabled
+						? "cursor-default"
+						: "cursor-grab hover:border-blue_munsell-400 hover:shadow-md active:cursor-grabbing"
+			} ${selected ? "border-blue_munsell-500 ring-2 ring-blue_munsell-500/30" : ""} ${isDragging ? "opacity-40" : ""}`}
 		>
 			<div className="flex items-start justify-between gap-2">
+				{bulkMode && (
+					<input
+						type="checkbox"
+						checked={selected}
+						onChange={onToggleSelection}
+						aria-label={`Select ${task.title}`}
+						className="mt-0.5 size-4 shrink-0 accent-blue_munsell-500"
+					/>
+				)}
 				<div className="min-w-0">
 					<h3 className="text-sm font-medium text-outer_space-500 dark:text-platinum-500">
 						{task.title}
@@ -108,15 +129,17 @@ export function TaskCard({
 						</p>
 					)}
 				</div>
-				<div className="shrink-0">
-					<EditTaskModal
-						projectId={projectId}
-						lists={lists}
-						members={members}
-						labels={labels}
-						task={task}
-					/>
-				</div>
+				{!bulkMode && (
+					<div className="shrink-0">
+						<EditTaskModal
+							projectId={projectId}
+							lists={lists}
+							members={members}
+							labels={labels}
+							task={task}
+						/>
+					</div>
+				)}
 			</div>
 
 			{task.description && (

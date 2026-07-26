@@ -1,4 +1,5 @@
 export * from "./activities";
+export * from "./bulk-tasks";
 export * from "./comments";
 export * from "./labels";
 export * from "./lists";

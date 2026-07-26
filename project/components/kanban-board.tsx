@@ -37,6 +37,7 @@ import {
 	updateListAction,
 } from "@/app/(dashboard)/projects/[id]/list-actions";
 import { saveBoardLayoutAction } from "@/app/(dashboard)/projects/[id]/task-actions";
+import { BulkTaskToolbar } from "@/components/bulk-task-toolbar";
 import {
 	CreateTaskModal,
 	type TaskMemberOption,
@@ -117,6 +118,7 @@ export function KanbanBoard({
 		confirmSnapshot,
 		rejectSnapshot,
 		clearMoveError,
+		bulkMode,
 	} = useBoardStore();
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const saveInFlight = useRef(false);
@@ -298,6 +300,12 @@ export function KanbanBoard({
 			onDragCancel={handleDragCancel}
 		>
 			<div className="overflow-hidden rounded-lg border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+				<BulkTaskToolbar
+					projectId={projectId}
+					lists={boardLists}
+					members={members}
+					labels={labels}
+				/>
 				{!dragEnabled && (
 					<p className="mb-4 rounded-lg bg-yellow-50 px-3 py-2 text-sm text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200">
 						Clear task filters to drag and reorder tasks.
@@ -325,7 +333,7 @@ export function KanbanBoard({
 							lists={boardLists}
 							members={members}
 							labels={labels}
-							dragDisabled={!dragEnabled}
+							dragDisabled={!dragEnabled || bulkMode}
 							canManage={canManage}
 							canMoveLeft={index > 0}
 							canMoveRight={index < boardLists.length - 1}
@@ -432,6 +440,11 @@ function ListColumn({
 			index: list.tasks.length,
 		},
 	});
+	const bulkMode = useBoardStore((state) => state.bulkMode);
+	const selectedTaskIds = useBoardStore((state) => state.selectedTaskIds);
+	const toggleTaskSelection = useBoardStore(
+		(state) => state.toggleTaskSelection,
+	);
 
 	return (
 		<section className="w-80 shrink-0 overflow-hidden rounded-lg border border-french_gray-300 bg-platinum-800 dark:border-paynes_gray-400 dark:bg-outer_space-400">
@@ -560,6 +573,9 @@ function ListColumn({
 								lists={lists}
 								members={members}
 								labels={labels}
+								bulkMode={bulkMode}
+								selected={selectedTaskIds.includes(task.id)}
+								onToggleSelection={() => toggleTaskSelection(task.id)}
 							/>
 						))
 					) : (

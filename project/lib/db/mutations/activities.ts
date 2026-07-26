@@ -7,6 +7,8 @@ export type ActivityAction =
 	| "task_field_changed"
 	| "task_moved"
 	| "task_reordered"
+	| "task_label_added"
+	| "task_label_removed"
 	| "comment_added"
 	| "comment_updated"
 	| "comment_deleted";

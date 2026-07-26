@@ -60,6 +60,8 @@ interface BoardState {
 	isDragging: boolean;
 	pendingMoves: BoardMove[];
 	moveError: string;
+	bulkMode: boolean;
+	selectedTaskIds: string[];
 	syncBoard: (projectId: string, lists: BoardList[]) => void;
 	startDragging: () => void;
 	stopDragging: () => void;
@@ -69,6 +71,10 @@ interface BoardState {
 	confirmSnapshot: (moveIds: string[], savedLists: BoardList[]) => void;
 	rejectSnapshot: (moveIds: string[], error: string) => void;
 	clearMoveError: () => void;
+	setBulkMode: (enabled: boolean) => void;
+	toggleTaskSelection: (taskId: string) => void;
+	selectTasks: (taskIds: string[]) => void;
+	clearTaskSelection: () => void;
 }
 
 export function moveTaskBetweenLists(
@@ -127,6 +133,8 @@ export const useBoardStore = create<BoardState>()((set) => ({
 	isDragging: false,
 	pendingMoves: [],
 	moveError: "",
+	bulkMode: false,
+	selectedTaskIds: [],
 
 	syncBoard: (projectId, lists) =>
 		set((state) => {
@@ -144,6 +152,15 @@ export const useBoardStore = create<BoardState>()((set) => ({
 				isDragging: false,
 				pendingMoves: [],
 				moveError: "",
+				bulkMode: state.projectId === projectId ? state.bulkMode : false,
+				selectedTaskIds:
+					state.projectId === projectId
+						? state.selectedTaskIds.filter((taskId) =>
+								lists.some((list) =>
+									list.tasks.some((task) => task.id === taskId),
+								),
+							)
+						: [],
 			};
 		}),
 
@@ -195,4 +212,17 @@ export const useBoardStore = create<BoardState>()((set) => ({
 		}),
 
 	clearMoveError: () => set({ moveError: "" }),
+	setBulkMode: (enabled) =>
+		set({
+			bulkMode: enabled,
+			selectedTaskIds: [],
+		}),
+	toggleTaskSelection: (taskId) =>
+		set((state) => ({
+			selectedTaskIds: state.selectedTaskIds.includes(taskId)
+				? state.selectedTaskIds.filter((id) => id !== taskId)
+				: [...state.selectedTaskIds, taskId],
+		})),
+	selectTasks: (taskIds) => set({ selectedTaskIds: [...new Set(taskIds)] }),
+	clearTaskSelection: () => set({ selectedTaskIds: [] }),
 }));

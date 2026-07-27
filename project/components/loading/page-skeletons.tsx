@@ -9,6 +9,15 @@ const boardColumns = [
 	{ id: "done", tasks: ["one", "two", "three"] },
 ];
 const teamCards = ["one", "two", "three", "four", "five", "six"];
+const analyticsStats = [
+	"velocity",
+	"efficiency",
+	"active-users",
+	"task-time",
+	"active-projects",
+	"overdue",
+	"assigned",
+];
 const analyticsDistributions = ["priority", "status"];
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const calendarDays = Array.from({ length: 42 }, (_, index) => index);
@@ -91,7 +100,7 @@ export function AnalyticsSkeleton() {
 		>
 			<PageHeadingSkeleton />
 			<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-				{dashboardStats.map((stat) => (
+				{analyticsStats.map((stat) => (
 					<div
 						key={stat}
 						className="space-y-3 rounded-xl border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500"

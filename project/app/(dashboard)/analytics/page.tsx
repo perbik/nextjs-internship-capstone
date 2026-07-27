@@ -1,9 +1,12 @@
 import {
 	AlertTriangle,
-	CheckCircle,
+	BarChart3,
 	ClipboardCheck,
+	Clock,
 	FolderKanban,
+	TrendingUp,
 	UserCheck,
+	Users,
 } from "lucide-react";
 import Link from "next/link";
 import { requireCurrentUser } from "@/lib/auth/current-user";
@@ -37,20 +40,44 @@ export default async function AnalyticsPage() {
 		await getAnalyticsData(user.id);
 	const metricCards = [
 		{
+			title: "Project Velocity",
+			value: metrics.projectVelocity,
+			detail: "tasks/week",
+			icon: TrendingUp,
+			className:
+				"bg-blue_munsell-100 text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300",
+		},
+		{
+			title: "Team Efficiency",
+			value: `${metrics.completionRate}%`,
+			detail: "completion rate",
+			icon: BarChart3,
+			className:
+				"bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+		},
+		{
+			title: "Active Users",
+			value: metrics.activeUsersThisWeek,
+			detail: "this week",
+			icon: Users,
+			className:
+				"bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+		},
+		{
+			title: "Avg. Task Time",
+			value: metrics.averageTaskTime,
+			detail: "days",
+			icon: Clock,
+			className:
+				"bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+		},
+		{
 			title: "Active projects",
 			value: metrics.activeProjects,
 			detail: "currently active",
 			icon: FolderKanban,
 			className:
 				"bg-blue_munsell-100 text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300",
-		},
-		{
-			title: "Completion rate",
-			value: `${metrics.completionRate}%`,
-			detail: `${metrics.completedTasks} of ${metrics.totalTasks} tasks`,
-			icon: CheckCircle,
-			className:
-				"bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
 		},
 		{
 			title: "Overdue tasks",

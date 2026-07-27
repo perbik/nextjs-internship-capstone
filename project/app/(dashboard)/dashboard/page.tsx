@@ -24,9 +24,9 @@ export default async function DashboardPage() {
 	const { stats, recentProjects } = await getDashboardData(user.id);
 	const statCards = [
 		{
-			name: "Pending Tasks",
-			value: stats.pendingTasks,
-			icon: ListTodo,
+			name: "Active Projects",
+			value: stats.activeProjects,
+			icon: FolderKanban,
 		},
 		{
 			name: "Team Members",
@@ -39,9 +39,9 @@ export default async function DashboardPage() {
 			icon: CheckCircle,
 		},
 		{
-			name: "Active Projects",
-			value: stats.activeProjects,
-			icon: FolderKanban,
+			name: "Pending Tasks",
+			value: stats.pendingTasks,
+			icon: ListTodo,
 		},
 	];
 

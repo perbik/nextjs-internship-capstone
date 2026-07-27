@@ -85,7 +85,11 @@ export async function bulkUpdateTasks(
 
 			if (input.operation === "move") {
 				const [targetList] = await tx
-					.select({ id: lists.id, name: lists.name })
+					.select({
+						id: lists.id,
+						name: lists.name,
+						isCompleted: lists.isCompleted,
+					})
 					.from(lists)
 					.where(
 						and(
@@ -137,6 +141,7 @@ export async function bulkUpdateTasks(
 							title: task.title,
 							fromListName: listNames.get(task.listId) ?? "Unknown column",
 							toListName: targetList.name,
+							toListCompleted: targetList.isCompleted,
 						},
 					});
 				}

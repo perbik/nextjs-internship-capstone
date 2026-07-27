@@ -148,7 +148,10 @@ export async function createTask(userId: string, data: TaskMutationData) {
 		taskId: task.id,
 		actorId: userId,
 		action: "task_created",
-		metadata: { title: task.title },
+		metadata: {
+			title: task.title,
+			listCompleted: list.isCompleted,
+		},
 	});
 	return task;
 }
@@ -355,6 +358,7 @@ export async function updateTask(
 				title: task.title,
 				fromListName: currentTask.listName,
 				toListName: targetList.name,
+				toListCompleted: targetList.isCompleted,
 			},
 		});
 	}
@@ -386,11 +390,18 @@ export async function saveBoardLayout(
 			);
 
 			const projectLists = await tx
-				.select({ id: lists.id, name: lists.name })
+				.select({
+					id: lists.id,
+					name: lists.name,
+					isCompleted: lists.isCompleted,
+				})
 				.from(lists)
 				.where(eq(lists.projectId, projectId));
 			const validListIds = new Set(projectLists.map(({ id }) => id));
 			const listNames = new Map(projectLists.map(({ id, name }) => [id, name]));
+			const completedLists = new Map(
+				projectLists.map(({ id, isCompleted }) => [id, isCompleted]),
+			);
 			const submittedListIds = layout.map(({ id }) => id);
 
 			if (
@@ -475,6 +486,10 @@ export async function saveBoardLayout(
 									current.listId === list.id
 										? null
 										: (listNames.get(list.id) ?? "Unknown column"),
+								toListCompleted:
+									current.listId === list.id
+										? null
+										: (completedLists.get(list.id) ?? false),
 							},
 						},
 					];

@@ -2,7 +2,13 @@
 
 import { Trash2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef } from "react";
+import {
+	useActionState,
+	useEffect,
+	useOptimistic,
+	useRef,
+	useState,
+} from "react";
 import {
 	addProjectMemberAction,
 	type MemberActionState,
@@ -16,6 +22,11 @@ interface ManagedMember {
 	email: string;
 	role: "owner" | "admin" | "member";
 	isCurrentUser: boolean;
+}
+
+interface OptimisticRoleChange {
+	userId: string;
+	role: "admin" | "member";
 }
 
 const initialState: MemberActionState = { message: "" };
@@ -105,21 +116,45 @@ function AddMemberForm({
 function RoleForm({
 	projectId,
 	member,
+	onOptimisticRoleChange,
+	onRoleChangeCommitted,
 }: {
 	projectId: string;
 	member: ManagedMember;
+	onOptimisticRoleChange: (change: OptimisticRoleChange) => void;
+	onRoleChangeCommitted: (change: OptimisticRoleChange) => void;
 }) {
 	const router = useRouter();
+	const [selectedRole, setSelectedRole] = useState<"admin" | "member">(
+		member.role === "admin" ? "admin" : "member",
+	);
 	const [state, action, isPending] = useActionState(
-		updateProjectMemberRoleAction,
+		async (previous: MemberActionState, formData: FormData) => {
+			const role = formData.get("role");
+
+			if (role === "admin" || role === "member") {
+				onOptimisticRoleChange({ userId: member.id, role });
+			}
+
+			const result = await updateProjectMemberRoleAction(previous, formData);
+
+			if (result.success) {
+				if (role === "admin" || role === "member") {
+					onRoleChangeCommitted({ userId: member.id, role });
+				}
+				router.refresh();
+			}
+
+			return result;
+		},
 		initialState,
 	);
 
 	useEffect(() => {
-		if (state.success) {
-			router.refresh();
+		if (member.role === "admin" || member.role === "member") {
+			setSelectedRole(member.role);
 		}
-	}, [router, state.success]);
+	}, [member.role]);
 
 	return (
 		<form action={action} className="flex items-center gap-2">
@@ -127,7 +162,10 @@ function RoleForm({
 			<input type="hidden" name="userId" value={member.id} />
 			<select
 				name="role"
-				defaultValue={member.role}
+				value={selectedRole}
+				onChange={(event) =>
+					setSelectedRole(event.target.value as "admin" | "member")
+				}
 				disabled={isPending}
 				aria-label={`Role for ${member.name}`}
 				className="rounded-lg border border-french_gray-300 bg-white px-2 py-1.5 text-xs capitalize text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
@@ -207,6 +245,27 @@ export function ProjectMembersManager({
 	members: ManagedMember[];
 	actorRole: "owner" | "admin";
 }) {
+	const [confirmedMembers, setConfirmedMembers] = useState(members);
+	const [optimisticMembers, applyOptimisticRoleChange] = useOptimistic(
+		confirmedMembers,
+		(currentMembers, change: OptimisticRoleChange) =>
+			currentMembers.map((member) =>
+				member.id === change.userId ? { ...member, role: change.role } : member,
+			),
+	);
+
+	useEffect(() => {
+		setConfirmedMembers(members);
+	}, [members]);
+
+	function commitRoleChange(change: OptimisticRoleChange) {
+		setConfirmedMembers((currentMembers) =>
+			currentMembers.map((member) =>
+				member.id === change.userId ? { ...member, role: change.role } : member,
+			),
+		);
+	}
+
 	return (
 		<section className="space-y-4 rounded-xl border border-french_gray-300 bg-white p-4 dark:border-paynes_gray-400 dark:bg-outer_space-500">
 			<div>
@@ -221,7 +280,7 @@ export function ProjectMembersManager({
 			<AddMemberForm projectId={projectId} actorRole={actorRole} />
 
 			<div className="divide-y divide-french_gray-300 dark:divide-paynes_gray-400">
-				{members.map((member) => {
+				{optimisticMembers.map((member) => {
 					const canChangeRole =
 						actorRole === "owner" && member.role !== "owner";
 					const canRemove =
@@ -245,7 +304,12 @@ export function ProjectMembersManager({
 							</div>
 							<div className="flex flex-wrap items-center gap-2">
 								{canChangeRole && (
-									<RoleForm projectId={projectId} member={member} />
+									<RoleForm
+										projectId={projectId}
+										member={member}
+										onOptimisticRoleChange={applyOptimisticRoleChange}
+										onRoleChangeCommitted={commitRoleChange}
+									/>
 								)}
 								{canRemove && (
 									<RemoveMemberForm projectId={projectId} member={member} />

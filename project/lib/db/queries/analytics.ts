@@ -88,7 +88,9 @@ export async function getAnalyticsData(userId: string) {
 			.select({
 				taskId: activityLogs.taskId,
 				taskCreatedAt: tasks.createdAt,
-				completedAt: sql<Date>`min(${activityLogs.createdAt})`,
+				completedAt: sql<Date>`min(${activityLogs.createdAt})`.mapWith(
+					activityLogs.createdAt,
+				),
 			})
 			.from(activityLogs)
 			.innerJoin(tasks, eq(activityLogs.taskId, tasks.id))

@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+	type AnyPgColumn,
 	boolean,
 	index,
 	integer,
@@ -20,6 +21,12 @@ export const projectStatus = pgEnum("project_status", [
 ]);
 
 export const projectMemberRole = pgEnum("project_member_role", [
+	"owner",
+	"admin",
+	"member",
+]);
+
+export const teamMemberRole = pgEnum("team_member_role", [
 	"owner",
 	"admin",
 	"member",
@@ -52,6 +59,9 @@ export const projects = pgTable(
 		ownerId: uuid("owner_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "restrict" }),
+		teamId: uuid("team_id").references((): AnyPgColumn => teams.id, {
+			onDelete: "set null",
+		}),
 		status: projectStatus("status").default("active").notNull(),
 		dueDate: timestamp("due_date", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true })
@@ -64,7 +74,51 @@ export const projects = pgTable(
 	},
 	(table) => [
 		index("projects_owner_id_idx").on(table.ownerId),
+		index("projects_team_id_idx").on(table.teamId),
 		index("projects_deleted_at_idx").on(table.deletedAt),
+	],
+);
+
+export const teams = pgTable(
+	"teams",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		name: text("name").notNull(),
+		description: text("description"),
+		ownerId: uuid("owner_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		deletedAt: timestamp("deleted_at", { withTimezone: true }),
+	},
+	(table) => [
+		index("teams_owner_id_idx").on(table.ownerId),
+		index("teams_deleted_at_idx").on(table.deletedAt),
+	],
+);
+
+export const teamMembers = pgTable(
+	"team_members",
+	{
+		teamId: uuid("team_id")
+			.notNull()
+			.references(() => teams.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		role: teamMemberRole("role").default("member").notNull(),
+		joinedAt: timestamp("joined_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		primaryKey({ columns: [table.teamId, table.userId] }),
+		index("team_members_user_id_idx").on(table.userId),
 	],
 );
 
@@ -237,6 +291,8 @@ export const activityLogs = pgTable(
 export const usersRelations = relations(users, ({ many }) => ({
 	ownedProjects: many(projects),
 	projectMemberships: many(projectMembers),
+	ownedTeams: many(teams),
+	teamMemberships: many(teamMembers),
 	assignedTasks: many(tasks),
 	comments: many(comments),
 	activities: many(activityLogs),
@@ -247,10 +303,34 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
 		fields: [projects.ownerId],
 		references: [users.id],
 	}),
+	team: one(teams, {
+		fields: [projects.teamId],
+		references: [teams.id],
+	}),
 	members: many(projectMembers),
 	lists: many(lists),
 	labels: many(labels),
 	activities: many(activityLogs),
+}));
+
+export const teamsRelations = relations(teams, ({ one, many }) => ({
+	owner: one(users, {
+		fields: [teams.ownerId],
+		references: [users.id],
+	}),
+	members: many(teamMembers),
+	projects: many(projects),
+}));
+
+export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
+	team: one(teams, {
+		fields: [teamMembers.teamId],
+		references: [teams.id],
+	}),
+	user: one(users, {
+		fields: [teamMembers.userId],
+		references: [users.id],
+	}),
 }));
 
 export const projectMembersRelations = relations(projectMembers, ({ one }) => ({
@@ -337,6 +417,10 @@ export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
 export type ProjectMember = typeof projectMembers.$inferSelect;
 export type NewProjectMember = typeof projectMembers.$inferInsert;
+export type Team = typeof teams.$inferSelect;
+export type NewTeam = typeof teams.$inferInsert;
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type NewTeamMember = typeof teamMembers.$inferInsert;
 export type List = typeof lists.$inferSelect;
 export type NewList = typeof lists.$inferInsert;
 export type Task = typeof tasks.$inferSelect;

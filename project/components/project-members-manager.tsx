@@ -34,9 +34,11 @@ const initialState: MemberActionState = { message: "" };
 function AddMemberForm({
 	projectId,
 	actorRole,
+	eligibleMembers,
 }: {
 	projectId: string;
 	actorRole: "owner" | "admin";
+	eligibleMembers: Array<{ id: string; name: string; email: string }>;
 }) {
 	const router = useRouter();
 	const formRef = useRef<HTMLFormElement>(null);
@@ -60,14 +62,25 @@ function AddMemberForm({
 		>
 			<input type="hidden" name="projectId" value={projectId} />
 			<label>
-				<span className="sr-only">Registered user email</span>
-				<input
-					type="email"
+				<span className="sr-only">Eligible team member</span>
+				<select
 					name="email"
 					required
-					placeholder="Registered user email"
-					className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
-				/>
+					defaultValue=""
+					disabled={eligibleMembers.length === 0}
+					className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 disabled:opacity-60 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
+				>
+					<option value="" disabled>
+						{eligibleMembers.length === 0
+							? "No eligible team members"
+							: "Select a team member"}
+					</option>
+					{eligibleMembers.map((member) => (
+						<option key={member.id} value={member.email}>
+							{member.name} ({member.email})
+						</option>
+					))}
+				</select>
 			</label>
 			{actorRole === "owner" ? (
 				<label>
@@ -86,7 +99,7 @@ function AddMemberForm({
 			)}
 			<button
 				type="submit"
-				disabled={isPending}
+				disabled={isPending || eligibleMembers.length === 0}
 				className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue_munsell-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue_munsell-600 disabled:opacity-60"
 			>
 				<UserPlus size={16} />
@@ -240,10 +253,12 @@ export function ProjectMembersManager({
 	projectId,
 	members,
 	actorRole,
+	eligibleMembers,
 }: {
 	projectId: string;
 	members: ManagedMember[];
 	actorRole: "owner" | "admin";
+	eligibleMembers: Array<{ id: string; name: string; email: string }>;
 }) {
 	const [confirmedMembers, setConfirmedMembers] = useState(members);
 	const [optimisticMembers, applyOptimisticRoleChange] = useOptimistic(
@@ -273,11 +288,15 @@ export function ProjectMembersManager({
 					Manage members
 				</h2>
 				<p className="mt-1 text-xs text-paynes_gray-500 dark:text-french_gray-400">
-					Add an existing ProjectFlow user by their account email.
+					Only members of this project's team can become collaborators.
 				</p>
 			</div>
 
-			<AddMemberForm projectId={projectId} actorRole={actorRole} />
+			<AddMemberForm
+				projectId={projectId}
+				actorRole={actorRole}
+				eligibleMembers={eligibleMembers}
+			/>
 
 			<div className="divide-y divide-french_gray-300 dark:divide-paynes_gray-400">
 				{optimisticMembers.map((member) => {

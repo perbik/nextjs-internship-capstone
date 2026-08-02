@@ -57,7 +57,9 @@ export const projectSchema = z.object({
 	dueDate: futureOptionalDate("Due date"),
 });
 
-export const projectCreateSchema = projectSchema;
+export const projectCreateSchema = projectSchema.extend({
+	teamId: z.uuid("Select a team for this project"),
+});
 
 export const projectUpdateSchema = projectSchema
 	.extend({
@@ -226,6 +228,33 @@ export const projectMemberRemoveSchema = z.object({
 	userId: z.uuid("Member must be a valid ID"),
 });
 
+export const projectTeamAssignSchema = z.object({
+	projectId: z.uuid("Project must be a valid ID"),
+	teamId: z.uuid("Select a valid team"),
+});
+
+export const teamCreateSchema = z.object({
+	name: requiredText("Team name", 100),
+	description: optionalText("Description", 500),
+});
+
+export const teamMemberCreateSchema = z.object({
+	teamId: z.uuid("Team must be a valid ID"),
+	email: z.email("Enter a valid member email").trim().toLowerCase(),
+	role: z.enum(["admin", "member"]),
+});
+
+export const teamMemberUpdateSchema = z.object({
+	teamId: z.uuid("Team must be a valid ID"),
+	userId: z.uuid("Member must be a valid ID"),
+	role: z.enum(["admin", "member"]),
+});
+
+export const teamMemberRemoveSchema = z.object({
+	teamId: z.uuid("Team must be a valid ID"),
+	userId: z.uuid("Member must be a valid ID"),
+});
+
 export const commentSchema = z.object({
 	content: requiredText("Comment", 1000),
 });
@@ -240,6 +269,7 @@ export const commentUpdateSchema = commentSchema.partial().refine(hasUpdate, {
 
 export type ProjectInput = z.input<typeof projectSchema>;
 export type ProjectData = z.output<typeof projectSchema>;
+export type ProjectCreateData = z.output<typeof projectCreateSchema>;
 export type TaskInput = z.input<typeof taskSchema>;
 export type TaskData = z.output<typeof taskSchema>;
 export type ProjectFilters = z.output<typeof projectFilterSchema>;

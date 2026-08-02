@@ -4,7 +4,10 @@ import { DebouncedSearchInput } from "@/components/debounced-search-input";
 import { CreateProjectModal } from "@/components/modals/create-project-modal";
 import { ProjectGrid } from "@/components/project-grid";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { getProjectSummariesForUser } from "@/lib/db/queries";
+import {
+	getManageableTeamsForUser,
+	getProjectSummariesForUser,
+} from "@/lib/db/queries";
 import { projectFilterSchema } from "@/lib/validations";
 
 function firstValue(value: string | string[] | undefined) {
@@ -26,7 +29,10 @@ export default async function ProjectsPage({
 	const hasFilters = Boolean(filters.q || filters.status || filters.role);
 	const hasDropdownFilters = Boolean(filters.status || filters.role);
 	const user = await requireCurrentUser();
-	const projects = await getProjectSummariesForUser(user.id, filters);
+	const [projects, manageableTeams] = await Promise.all([
+		getProjectSummariesForUser(user.id, filters),
+		getManageableTeamsForUser(user.id),
+	]);
 
 	return (
 		<div className="space-y-6">
@@ -42,7 +48,7 @@ export default async function ProjectsPage({
 								: `${projects.length} ${projects.length === 1 ? "project" : "projects"} available to you.`}
 						</p>
 					</div>
-					<CreateProjectModal />
+					<CreateProjectModal teams={manageableTeams} />
 				</div>
 			</div>
 

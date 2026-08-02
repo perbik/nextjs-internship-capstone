@@ -9,7 +9,13 @@ import {
 
 const initialState: ProjectActionState = { message: "" };
 
-export function CreateProjectModal() {
+export function CreateProjectModal({
+	teams = [],
+	defaultTeamId,
+}: {
+	teams?: Array<{ id: string; name: string }>;
+	defaultTeamId?: string;
+}) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [state, formAction, isPending] = useActionState(
 		createProjectAction,
@@ -75,6 +81,34 @@ export function CreateProjectModal() {
 								error={state.errors?.dueDate?.[0]}
 							/>
 
+							<div>
+								<label
+									htmlFor="create-project-team"
+									className="mb-1 block text-sm font-medium text-outer_space-500 dark:text-platinum-500"
+								>
+									Team
+								</label>
+								<select
+									id="create-project-team"
+									name="teamId"
+									required
+									defaultValue={defaultTeamId ?? ""}
+									className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-outer_space-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
+								>
+									<option value="" disabled>
+										{teams.length === 0
+											? "Create or administer a team first"
+											: "Select a team"}
+									</option>
+									{teams.map((team) => (
+										<option key={team.id} value={team.id}>
+											{team.name}
+										</option>
+									))}
+								</select>
+								<FieldError message={state.errors?.teamId?.[0]} />
+							</div>
+
 							{state.message && (
 								<p
 									className="text-sm text-red-600 dark:text-red-400"
@@ -94,7 +128,7 @@ export function CreateProjectModal() {
 								</button>
 								<button
 									type="submit"
-									disabled={isPending}
+									disabled={isPending || teams.length === 0}
 									className="rounded-lg bg-blue_munsell-500 px-4 py-2 text-white hover:bg-blue_munsell-600 disabled:cursor-not-allowed disabled:opacity-60"
 								>
 									{isPending ? "Creating..." : "Create project"}

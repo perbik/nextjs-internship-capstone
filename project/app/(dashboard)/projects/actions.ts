@@ -4,11 +4,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import {
+	assignProjectToTeam,
 	createProject,
 	softDeleteProject,
 	updateProject,
 } from "@/lib/db/mutations";
-import { projectCreateSchema, projectUpdateSchema } from "@/lib/validations";
+import {
+	projectCreateSchema,
+	projectTeamAssignSchema,
+	projectUpdateSchema,
+} from "@/lib/validations";
 
 export interface ProjectActionState {
 	message: string;
@@ -43,6 +48,7 @@ export async function createProjectAction(
 		name: formValue(formData, "name"),
 		description: formValue(formData, "description"),
 		dueDate: formValue(formData, "dueDate"),
+		teamId: formValue(formData, "teamId"),
 	});
 
 	if (!parsed.success) {
@@ -66,6 +72,7 @@ export async function createProjectAction(
 
 	revalidatePath("/dashboard");
 	revalidatePath("/projects");
+	revalidatePath("/team");
 	redirect(`/projects/${projectId}`);
 }
 
@@ -126,4 +133,37 @@ export async function deleteProjectAction(formData: FormData) {
 	revalidatePath("/dashboard");
 	revalidatePath("/projects");
 	redirect("/projects");
+}
+
+export async function assignProjectTeamAction(
+	_previousState: ProjectActionState,
+	formData: FormData,
+): Promise<ProjectActionState> {
+	const parsed = projectTeamAssignSchema.safeParse({
+		projectId: formValue(formData, "projectId"),
+		teamId: formValue(formData, "teamId"),
+	});
+	if (!parsed.success) {
+		return { message: "Select a valid team" };
+	}
+
+	try {
+		const user = await requireCurrentUser();
+		await assignProjectToTeam(
+			parsed.data.projectId,
+			user.id,
+			parsed.data.teamId,
+		);
+		revalidatePath(`/projects/${parsed.data.projectId}`);
+		revalidatePath("/projects");
+		revalidatePath("/team");
+		return { message: "Project assigned to team", success: true };
+	} catch (error) {
+		return {
+			message:
+				error instanceof Error
+					? error.message
+					: "Unable to assign project team",
+		};
+	}
 }

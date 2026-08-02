@@ -1,6 +1,7 @@
 import { ArrowLeft, RotateCcw, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AssignProjectTeamForm } from "@/components/assign-project-team-form";
 import { DebouncedSearchInput } from "@/components/debounced-search-input";
 import { KanbanBoard } from "@/components/kanban-board";
 import { ProjectActions } from "@/components/project-actions";
@@ -8,7 +9,11 @@ import { ProjectCollaborators } from "@/components/project-collaborators";
 import { ProjectLabels } from "@/components/project-labels";
 import { ProjectMembersManager } from "@/components/project-members-manager";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { getProjectBoard } from "@/lib/db/queries";
+import {
+	getEligibleTeamMembersForProject,
+	getManageableTeamsForUser,
+	getProjectBoard,
+} from "@/lib/db/queries";
 import { taskFilterSchema } from "@/lib/validations";
 
 function firstValue(value: string | string[] | undefined) {
@@ -45,6 +50,10 @@ export default async function ProjectPage({
 	const canManage =
 		membership?.role === "owner" || membership?.role === "admin";
 	const canDelete = project.ownerId === user.id;
+	const manageableTeams =
+		canDelete && !project.teamId
+			? await getManageableTeamsForUser(user.id)
+			: [];
 	const members = project.members.map(({ user: member, role }) => ({
 		id: member.id,
 		name:
@@ -54,6 +63,20 @@ export default async function ProjectPage({
 		role,
 		isCurrentUser: member.id === user.id,
 	}));
+	const eligibleTeamMembers = canManage
+		? await getEligibleTeamMembersForProject(project.id, user.id)
+		: [];
+	const projectMemberIds = new Set(members.map(({ id }) => id));
+	const availableTeamMembers = eligibleTeamMembers
+		.filter(({ user: eligibleUser }) => !projectMemberIds.has(eligibleUser.id))
+		.map(({ user: eligibleUser }) => ({
+			id: eligibleUser.id,
+			name:
+				[eligibleUser.firstName, eligibleUser.lastName]
+					.filter(Boolean)
+					.join(" ") || eligibleUser.email,
+			email: eligibleUser.email,
+		}));
 	const matchingTaskCount = project.lists.reduce(
 		(total, list) => total + list.tasks.length,
 		0,
@@ -110,11 +133,15 @@ export default async function ProjectPage({
 			</div>
 
 			<ProjectCollaborators members={members} />
+			{canDelete && !project.teamId && (
+				<AssignProjectTeamForm projectId={project.id} teams={manageableTeams} />
+			)}
 			{(membership?.role === "owner" || membership?.role === "admin") && (
 				<ProjectMembersManager
 					projectId={project.id}
 					members={members}
 					actorRole={membership.role}
+					eligibleMembers={availableTeamMembers}
 				/>
 			)}
 			<ProjectLabels

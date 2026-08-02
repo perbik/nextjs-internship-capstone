@@ -43,6 +43,13 @@
       "when": 1785394874750,
       "tag": "20260730070114_remove_teams_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785421164323,
+      "tag": "20260730141924_create_team_project_collaboration_flow",
+      "breakpoints": true
     }
   ]
 }

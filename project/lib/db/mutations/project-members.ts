@@ -1,6 +1,13 @@
 import { and, eq, ilike, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { lists, projectMembers, projects, tasks, users } from "@/lib/db/schema";
+import {
+	lists,
+	projectMembers,
+	projects,
+	tasks,
+	teamMembers,
+	users,
+} from "@/lib/db/schema";
 
 type ManageableRole = "admin" | "member";
 
@@ -8,6 +15,7 @@ async function requireManagementContext(projectId: string, actorId: string) {
 	const [context] = await db
 		.select({
 			ownerId: projects.ownerId,
+			teamId: projects.teamId,
 			actorRole: projectMembers.role,
 		})
 		.from(projects)
@@ -51,6 +59,27 @@ export async function addProjectMember(
 
 	if (!user) {
 		throw new Error("No registered ProjectFlow user was found with that email");
+	}
+
+	if (!context.teamId) {
+		throw new Error(
+			"Assign this project to a team before adding collaborators",
+		);
+	}
+	const [teamMembership] = await db
+		.select({ userId: teamMembers.userId })
+		.from(teamMembers)
+		.where(
+			and(
+				eq(teamMembers.teamId, context.teamId),
+				eq(teamMembers.userId, user.id),
+			),
+		)
+		.limit(1);
+	if (!teamMembership) {
+		throw new Error(
+			"Invite this user to the team before adding them to the project",
+		);
 	}
 
 	const [existing] = await db

@@ -96,6 +96,7 @@ export async function createTaskAction(
 	revalidatePath(`/projects/${projectId.data}`);
 	revalidatePath("/projects");
 	revalidatePath("/dashboard");
+	revalidatePath("/calendar");
 	return { message: "Task created", success: true };
 }
 
@@ -142,6 +143,7 @@ export async function updateTaskAction(
 	revalidatePath(`/projects/${projectId.data}`);
 	revalidatePath("/projects");
 	revalidatePath("/dashboard");
+	revalidatePath("/calendar");
 	return { message: "Task updated", success: true };
 }
 

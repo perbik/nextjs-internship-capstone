@@ -1,6 +1,12 @@
-import { and, asc, eq, gte, isNull, lt } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { lists, projectMembers, projects, tasks } from "@/lib/db/schema";
+import {
+	labels,
+	lists,
+	projectMembers,
+	projects,
+	tasks,
+} from "@/lib/db/schema";
 
 export async function getCalendarDeadlines(
 	userId: string,
@@ -64,4 +70,30 @@ export async function getCalendarDeadlines(
 				Boolean(deadline.dueDate),
 		),
 	};
+}
+
+export async function getCalendarTaskCreationOptions(userId: string) {
+	const memberships = await db
+		.select({ projectId: projectMembers.projectId })
+		.from(projectMembers)
+		.innerJoin(projects, eq(projectMembers.projectId, projects.id))
+		.where(and(eq(projectMembers.userId, userId), isNull(projects.deletedAt)));
+
+	if (memberships.length === 0) return [];
+
+	return db.query.projects.findMany({
+		where: and(
+			inArray(
+				projects.id,
+				memberships.map(({ projectId }) => projectId),
+			),
+			isNull(projects.deletedAt),
+		),
+		orderBy: asc(projects.name),
+		with: {
+			lists: { orderBy: asc(lists.position) },
+			members: { with: { user: true } },
+			labels: { orderBy: asc(labels.name) },
+		},
+	});
 }

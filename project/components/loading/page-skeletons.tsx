@@ -9,16 +9,7 @@ const boardColumns = [
 	{ id: "done", tasks: ["one", "two", "three"] },
 ];
 const teamCards = ["one", "two", "three", "four", "five", "six"];
-const analyticsStats = [
-	"velocity",
-	"efficiency",
-	"active-users",
-	"task-time",
-	"active-projects",
-	"overdue",
-	"assigned",
-];
-const analyticsDistributions = ["priority", "status"];
+const analyticsStats = ["velocity", "efficiency", "active-users", "task-time"];
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const calendarDays = Array.from({ length: 42 }, (_, index) => index);
 
@@ -113,24 +104,25 @@ export function AnalyticsSkeleton() {
 				))}
 			</div>
 			<div className="grid gap-6 lg:grid-cols-2">
-				{analyticsDistributions.map((distribution) => (
-					<div
-						key={distribution}
-						className="space-y-5 rounded-xl border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500"
-					>
-						<Skeleton className="h-6 w-40" />
-						{dashboardRows.slice(0, 3).map((row) => (
-							<div key={row} className="space-y-2">
-								<Skeleton className="h-4 w-full" />
-								<Skeleton className="h-2.5 w-full rounded-full" />
-							</div>
-						))}
+				<div className="space-y-5 rounded-xl border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+					<Skeleton className="h-6 w-36" />
+					<Skeleton className="h-4 w-72 max-w-full" />
+					<div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center">
+						<Skeleton className="size-44 rounded-full" />
+						<div className="w-full max-w-56 space-y-3">
+							{dashboardRows.slice(0, 3).map((row) => (
+								<Skeleton key={row} className="h-10 w-full rounded-lg" />
+							))}
+						</div>
 					</div>
-				))}
-			</div>
-			<div className="grid gap-6 lg:grid-cols-2">
-				<Skeleton className="h-80 w-full rounded-xl" />
-				<Skeleton className="h-80 w-full rounded-xl" />
+				</div>
+				<div className="space-y-4 rounded-xl border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+					<Skeleton className="h-6 w-32" />
+					<Skeleton className="h-4 w-64 max-w-full" />
+					{dashboardRows.map((row) => (
+						<Skeleton key={row} className="h-14 w-full rounded-lg" />
+					))}
+				</div>
 			</div>
 		</div>
 	);

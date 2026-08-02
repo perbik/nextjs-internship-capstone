@@ -1,11 +1,8 @@
 import {
-	AlertTriangle,
 	BarChart3,
 	ClipboardCheck,
 	Clock,
-	FolderKanban,
 	TrendingUp,
-	UserCheck,
 	Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -36,8 +33,7 @@ function actorName(actor: {
 
 export default async function AnalyticsPage() {
 	const user = await requireCurrentUser();
-	const { metrics, priorities, projectStatuses, recentActivity } =
-		await getAnalyticsData(user.id);
+	const { metrics, recentActivity } = await getAnalyticsData(user.id);
 	const metricCards = [
 		{
 			title: "Project Velocity",
@@ -71,58 +67,7 @@ export default async function AnalyticsPage() {
 			className:
 				"bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
 		},
-		{
-			title: "Active projects",
-			value: metrics.activeProjects,
-			detail: "currently active",
-			icon: FolderKanban,
-			className:
-				"bg-blue_munsell-100 text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300",
-		},
-		{
-			title: "Overdue tasks",
-			value: metrics.overdueTasks,
-			detail: "in incomplete columns",
-			icon: AlertTriangle,
-			className: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-		},
-		{
-			title: "Assigned to me",
-			value: metrics.assignedToMe,
-			detail: "active tasks",
-			icon: UserCheck,
-			className:
-				"bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-		},
 	];
-	const priorityData = [
-		{ label: "Low", value: priorities.low, className: "bg-green-500" },
-		{
-			label: "Medium",
-			value: priorities.medium,
-			className: "bg-blue_munsell-500",
-		},
-		{ label: "High", value: priorities.high, className: "bg-red-500" },
-	];
-	const statusData = [
-		{
-			label: "Active",
-			value: projectStatuses.active,
-			className: "bg-blue_munsell-500",
-		},
-		{
-			label: "Completed",
-			value: projectStatuses.completed,
-			className: "bg-green-500",
-		},
-		{
-			label: "On hold",
-			value: projectStatuses.onHold,
-			className: "bg-yellow-500",
-		},
-	];
-	const maxPriority = Math.max(...priorityData.map(({ value }) => value), 1);
-	const maxStatus = Math.max(...statusData.map(({ value }) => value), 1);
 
 	return (
 		<div className="space-y-6">
@@ -157,19 +102,6 @@ export default async function AnalyticsPage() {
 						</p>
 					</article>
 				))}
-			</div>
-
-			<div className="grid gap-6 lg:grid-cols-2">
-				<DistributionCard
-					title="Tasks by priority"
-					data={priorityData}
-					maxValue={maxPriority}
-				/>
-				<DistributionCard
-					title="Projects by status"
-					data={statusData}
-					maxValue={maxStatus}
-				/>
 			</div>
 
 			<div className="grid gap-6 lg:grid-cols-2">
@@ -278,43 +210,5 @@ export default async function AnalyticsPage() {
 				</section>
 			</div>
 		</div>
-	);
-}
-
-function DistributionCard({
-	title,
-	data,
-	maxValue,
-}: {
-	title: string;
-	data: Array<{ label: string; value: number; className: string }>;
-	maxValue: number;
-}) {
-	return (
-		<section className="rounded-xl border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
-			<h2 className="text-lg font-semibold text-outer_space-500 dark:text-platinum-500">
-				{title}
-			</h2>
-			<div className="mt-5 space-y-4">
-				{data.map((item) => (
-					<div key={item.label}>
-						<div className="mb-1.5 flex justify-between text-sm">
-							<span className="text-paynes_gray-500 dark:text-french_gray-400">
-								{item.label}
-							</span>
-							<span className="font-medium text-outer_space-500 dark:text-platinum-500">
-								{item.value}
-							</span>
-						</div>
-						<div className="h-2.5 overflow-hidden rounded-full bg-french_gray-200 dark:bg-paynes_gray-400">
-							<div
-								className={`h-full rounded-full ${item.className}`}
-								style={{ width: `${(item.value / maxValue) * 100}%` }}
-							/>
-						</div>
-					</div>
-				))}
-			</div>
-		</section>
 	);
 }

@@ -72,7 +72,7 @@ export async function getCalendarDeadlines(
 	};
 }
 
-export async function getCalendarTaskCreationOptions(userId: string) {
+export async function getTaskCreationOptions(userId: string) {
 	const memberships = await db
 		.select({ projectId: projectMembers.projectId })
 		.from(projectMembers)

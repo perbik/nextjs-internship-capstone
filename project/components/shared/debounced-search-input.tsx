@@ -9,6 +9,7 @@ interface DebouncedSearchInputProps {
 	placeholder: string;
 	maxLength: number;
 	accessibleLabel: string;
+	variant?: "default" | "pill";
 }
 
 export function DebouncedSearchInput({
@@ -16,6 +17,7 @@ export function DebouncedSearchInput({
 	placeholder,
 	maxLength,
 	accessibleLabel,
+	variant = "default",
 }: DebouncedSearchInputProps) {
 	const router = useRouter();
 	const pathname = usePathname();
@@ -63,7 +65,7 @@ export function DebouncedSearchInput({
 	}, [pathname, router, searchParams, value]);
 
 	return (
-		<label className="relative">
+		<label className="relative block">
 			<span className="sr-only">{accessibleLabel}</span>
 			<Search
 				size={17}
@@ -76,7 +78,11 @@ export function DebouncedSearchInput({
 				value={value}
 				onChange={(event) => setValue(event.target.value)}
 				placeholder={placeholder}
-				className="w-full rounded-lg border border-french_gray-300 bg-white py-2 pl-10 pr-10 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
+				className={`w-full border bg-card py-2 pl-10 pr-10 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-brand/30 dark:bg-outer_space-400 dark:text-platinum-500 ${
+					variant === "pill"
+						? "h-11 rounded-full border-border"
+						: "rounded-lg border-french_gray-300 dark:border-paynes_gray-400"
+				}`}
 			/>
 			{isPending && (
 				<LoaderCircle

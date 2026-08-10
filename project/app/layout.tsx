@@ -1,17 +1,21 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import type React from "react";
-import "./globals.css";
+import "../styles/globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { shadcn } from "@clerk/themes";
-import { ThemeProvider } from "@/components/theme-provider";
+import { ui } from "@clerk/ui";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const plusJakartaSans = Plus_Jakarta_Sans({
+	subsets: ["latin"],
+	variable: "--font-plus-jakarta",
+});
 
 export const metadata: Metadata = {
-	title: "Project Management Tool",
-	description: "Team collaboration and project management platform",
-	generator: "v0.dev",
+	title: "Brix — Project Management",
+	description: "Break projects down and build progress up with your team.",
 };
 
 export default function RootLayout({
@@ -20,9 +24,9 @@ export default function RootLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		<html lang="en" suppressHydrationWarning>
-			<body className={inter.className}>
-				<ClerkProvider appearance={{ theme: shadcn }}>
+		<html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
+			<body className={`${inter.variable} ${plusJakartaSans.variable}`}>
+				<ClerkProvider appearance={{ theme: shadcn }} ui={ui}>
 					<ThemeProvider>{children}</ThemeProvider>
 				</ClerkProvider>
 			</body>

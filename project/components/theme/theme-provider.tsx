@@ -5,29 +5,29 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "dark" | "light";
 
-type ThemeProviderProps = {
+interface ThemeProviderProps {
 	children: React.ReactNode;
-};
+}
 
-type ThemeProviderState = {
+interface ThemeProviderState {
 	theme: Theme;
 	setTheme: (theme: Theme) => void;
-};
+}
 
-const initialState: ThemeProviderState = {
-	theme: "light",
-	setTheme: () => null,
-};
+const ThemeProviderContext = createContext<ThemeProviderState | undefined>(
+	undefined,
+);
 
-const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
+function isTheme(value: string | null): value is Theme {
+	return value === "light" || value === "dark";
+}
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
 	const [theme, setTheme] = useState<Theme>("light");
 
 	useEffect(() => {
-		// Check for saved theme preference or default to light
-		const savedTheme = localStorage.getItem("theme") as Theme;
-		if (savedTheme) {
+		const savedTheme = localStorage.getItem("theme");
+		if (isTheme(savedTheme)) {
 			setTheme(savedTheme);
 		}
 	}, []);
@@ -54,8 +54,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 export const useTheme = () => {
 	const context = useContext(ThemeProviderContext);
 
-	if (context === undefined)
+	if (context === undefined) {
 		throw new Error("useTheme must be used within a ThemeProvider");
+	}
 
 	return context;
 };

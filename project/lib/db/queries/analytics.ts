@@ -82,7 +82,7 @@ export async function getAnalyticsData(userId: string) {
 				.leftJoin(users, eq(activityLogs.actorId, users.id))
 				.where(isNull(projects.deletedAt))
 				.orderBy(desc(activityLogs.createdAt))
-				.limit(10),
+				.limit(5),
 		]);
 
 	const totalTasks = projectSummaries.reduce(

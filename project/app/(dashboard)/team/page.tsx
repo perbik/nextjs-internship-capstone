@@ -1,4 +1,4 @@
-import { TeamsManager } from "@/components/teams-manager";
+import { TeamsManager } from "@/components/team/teams-manager";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { getTeamsForUser } from "@/lib/db/queries";
 
@@ -17,14 +17,13 @@ export default async function TeamPage() {
 	const teams = await getTeamsForUser(currentUser.id);
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-7">
 			<div>
-				<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
+				<h1 className="text-3xl font-extrabold tracking-[-0.03em] text-foreground sm:text-4xl dark:text-white">
 					Teams
 				</h1>
-				<p className="mt-2 text-paynes_gray-500 dark:text-french_gray-500">
-					Invite registered users into teams, then grant selected team members
-					access to individual projects.
+				<p className="mt-2 text-sm text-muted-foreground sm:text-base">
+					Manage your teams, members, project access, and permissions
 				</p>
 			</div>
 			<TeamsManager

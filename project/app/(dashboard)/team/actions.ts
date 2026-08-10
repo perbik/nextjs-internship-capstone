@@ -26,6 +26,16 @@ const value = (data: FormData, key: string) => {
 	return typeof entry === "string" ? entry : undefined;
 };
 
+function validationErrors(
+	errors: Record<string, string[] | undefined>,
+): Record<string, string[]> {
+	return Object.fromEntries(
+		Object.entries(errors).filter((entry): entry is [string, string[]] =>
+			Boolean(entry[1]),
+		),
+	);
+}
+
 export async function createTeamAction(
 	_previous: TeamActionState,
 	formData: FormData,
@@ -37,7 +47,7 @@ export async function createTeamAction(
 	if (!parsed.success) {
 		return {
 			message: "Please correct the team details",
-			errors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+			errors: validationErrors(parsed.error.flatten().fieldErrors),
 		};
 	}
 	try {
@@ -72,6 +82,8 @@ export async function addTeamMemberAction(
 			parsed.data.role,
 		);
 		revalidatePath("/team");
+		revalidatePath("/dashboard");
+		revalidatePath(`/team/${parsed.data.teamId}`);
 		return { message: "Member invited to team", success: true };
 	} catch (error) {
 		return {
@@ -99,6 +111,7 @@ export async function updateTeamMemberRoleAction(
 			parsed.data.role,
 		);
 		revalidatePath("/team");
+		revalidatePath(`/team/${parsed.data.teamId}`);
 		return { message: "Role updated", success: true };
 	} catch (error) {
 		return {
@@ -120,6 +133,7 @@ export async function removeTeamMemberAction(
 		const user = await requireCurrentUser();
 		await removeTeamMember(parsed.data.teamId, user.id, parsed.data.userId);
 		revalidatePath("/team");
+		revalidatePath(`/team/${parsed.data.teamId}`);
 		revalidatePath("/projects", "layout");
 		revalidatePath("/dashboard");
 		return { message: "Member removed", success: true };

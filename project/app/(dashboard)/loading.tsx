@@ -1,4 +1,4 @@
-import { GenericPageSkeleton } from "@/components/loading/page-skeletons";
+import { GenericPageSkeleton } from "@/components/loading";
 
 export default function Loading() {
 	return <GenericPageSkeleton />;

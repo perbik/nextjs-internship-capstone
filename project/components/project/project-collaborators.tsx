@@ -9,6 +9,7 @@ interface Collaborator {
 
 interface ProjectCollaboratorsProps {
 	members: Collaborator[];
+	variant?: "default" | "stack";
 }
 
 function initials(name: string) {
@@ -19,14 +20,46 @@ function initials(name: string) {
 		.join("");
 }
 
-export function ProjectCollaborators({ members }: ProjectCollaboratorsProps) {
+const avatarColors = ["bg-brand", "bg-[#6366f1]", "bg-[#0ea5e9]"];
+
+export function ProjectCollaborators({
+	members,
+	variant = "default",
+}: ProjectCollaboratorsProps) {
+	if (variant === "stack") {
+		const visibleMembers = members.slice(0, 3);
+		const remainingCount = members.length - visibleMembers.length;
+
+		return (
+			<ul
+				className="flex items-center"
+				aria-label={`${members.length} project collaborators`}
+			>
+				{visibleMembers.map((member, index) => (
+					<li
+						key={member.id}
+						title={`${member.name} · ${member.role}${member.isCurrentUser ? " · You" : ""}`}
+						className={`flex size-9 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold text-white ${index > 0 ? "-ml-1" : ""} ${avatarColors[index % avatarColors.length]}`}
+					>
+						{initials(member.name)}
+					</li>
+				))}
+				{remainingCount > 0 && (
+					<li className="-ml-1 flex size-9 items-center justify-center rounded-full border-2 border-white bg-[#c8c8c8] text-[11px] font-bold text-white">
+						+{remainingCount}
+					</li>
+				)}
+			</ul>
+		);
+	}
+
 	const visibleMembers = members.slice(0, 6);
 	const remainingCount = members.length - visibleMembers.length;
 
 	return (
 		<section
 			aria-label="Project collaborators"
-			className="flex flex-col justify-between gap-3 rounded-xl border border-french_gray-300 bg-white px-4 py-3 sm:flex-row sm:items-center dark:border-paynes_gray-400 dark:bg-outer_space-500"
+			className="flex flex-col justify-between gap-3 rounded-xl border border-french_gray-300 bg-card px-4 py-3 sm:flex-row sm:items-center dark:border-paynes_gray-400 dark:bg-outer_space-500"
 		>
 			<div className="flex items-center gap-2 text-sm text-paynes_gray-500 dark:text-french_gray-400">
 				<Users size={17} className="text-blue_munsell-500" />

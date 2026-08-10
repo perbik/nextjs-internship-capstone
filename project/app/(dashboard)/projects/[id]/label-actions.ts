@@ -49,15 +49,25 @@ export async function createLabelAction(
 	return { message: "Label created", success: true };
 }
 
-export async function deleteLabelAction(formData: FormData) {
+export async function deleteLabelAction(
+	_previousState: LabelActionState,
+	formData: FormData,
+): Promise<LabelActionState> {
 	const labelId = z.uuid().safeParse(formValue(formData, "labelId"));
 	const projectId = z.uuid().safeParse(formValue(formData, "projectId"));
 
 	if (!labelId.success || !projectId.success) {
-		return;
+		return { message: "Invalid label or project ID" };
 	}
 
-	const user = await requireCurrentUser();
-	await deleteLabel(labelId.data, user.id);
+	try {
+		const user = await requireCurrentUser();
+		await deleteLabel(labelId.data, user.id);
+	} catch (error) {
+		console.error("Failed to delete label", error);
+		return { message: "Unable to delete the label" };
+	}
+
 	revalidatePath(`/projects/${projectId.data}`);
+	return { message: "Label deleted", success: true };
 }

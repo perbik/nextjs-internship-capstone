@@ -365,6 +365,87 @@ export async function updateTask(
 	return task;
 }
 
+export async function deleteTask(
+	taskId: string,
+	projectId: string,
+	userId: string,
+) {
+	const [currentTask] = await db
+		.select({
+			task: tasks,
+			projectId: lists.projectId,
+			listName: lists.name,
+		})
+		.from(tasks)
+		.innerJoin(lists, eq(tasks.listId, lists.id))
+		.where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt)))
+		.limit(1);
+
+	if (
+		!currentTask ||
+		currentTask.projectId !== projectId ||
+		!(await canAccessProject(currentTask.projectId, userId))
+	) {
+		throw new Error("You do not have permission to delete this task");
+	}
+
+	const deletedAt = new Date();
+	const databaseUrl = process.env.DATABASE_URL;
+
+	if (!databaseUrl) {
+		throw new Error("DATABASE_URL is required");
+	}
+
+	const pool = new Pool({ connectionString: databaseUrl });
+	const transactionDb = drizzle({ client: pool, schema });
+
+	try {
+		await transactionDb.transaction(async (tx) => {
+			const [deletedTask] = await tx
+				.update(tasks)
+				.set({ deletedAt, updatedAt: deletedAt })
+				.where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt)))
+				.returning({ id: tasks.id });
+
+			if (!deletedTask) {
+				throw new Error("This task has already been deleted");
+			}
+
+			await tx
+				.update(tasks)
+				.set({
+					position: sql`${tasks.position} - 1`,
+					updatedAt: deletedAt,
+				})
+				.where(
+					and(
+						eq(tasks.listId, currentTask.task.listId),
+						gt(tasks.position, currentTask.task.position),
+						isNull(tasks.deletedAt),
+					),
+				);
+
+			await tx.insert(activityLogs).values({
+				projectId: currentTask.projectId,
+				taskId,
+				actorId: userId,
+				action: "task_deleted",
+				metadata: {
+					title: currentTask.task.title,
+					listName: currentTask.listName,
+				},
+			});
+
+			await tx
+				.update(projects)
+				.set({ updatedAt: deletedAt })
+				.where(eq(projects.id, currentTask.projectId));
+		});
+	} finally {
+		await pool.end();
+	}
+}
+
 export async function saveBoardLayout(
 	projectId: string,
 	userId: string,

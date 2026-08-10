@@ -6,6 +6,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import {
 	bulkUpdateTasks,
 	createTask,
+	deleteTask,
 	saveBoardLayout,
 	updateTask,
 } from "@/lib/db/mutations";
@@ -145,6 +146,35 @@ export async function updateTaskAction(
 	revalidatePath("/dashboard");
 	revalidatePath("/calendar");
 	return { message: "Task updated", success: true };
+}
+
+export async function deleteTaskAction(
+	_previousState: TaskActionState,
+	formData: FormData,
+): Promise<TaskActionState> {
+	const projectId = z.uuid().safeParse(formValue(formData, "projectId"));
+	const taskId = z.uuid().safeParse(formValue(formData, "taskId"));
+
+	if (!projectId.success || !taskId.success) {
+		return { message: "Invalid task or project ID" };
+	}
+
+	try {
+		const user = await requireCurrentUser();
+		await deleteTask(taskId.data, projectId.data, user.id);
+	} catch (error) {
+		return {
+			message:
+				error instanceof Error ? error.message : "Unable to delete the task",
+		};
+	}
+
+	revalidatePath(`/projects/${projectId.data}`);
+	revalidatePath("/projects");
+	revalidatePath("/dashboard");
+	revalidatePath("/calendar");
+	revalidatePath("/analytics");
+	return { message: "Task deleted", success: true };
 }
 
 export async function saveBoardLayoutAction(

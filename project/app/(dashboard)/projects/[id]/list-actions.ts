@@ -138,13 +138,26 @@ export async function deleteListAction(
 	return { message: "List deleted", success: true };
 }
 
-export async function moveListAction(formData: FormData) {
-	const listId = listIdSchema.parse(formValue(formData, "listId"));
-	const projectId = z.uuid().parse(formValue(formData, "projectId"));
-	const direction = directionSchema.parse(formValue(formData, "direction"));
-	const user = await requireCurrentUser();
+export async function moveListAction(
+	formData: FormData,
+): Promise<ListActionState> {
+	const listId = listIdSchema.safeParse(formValue(formData, "listId"));
+	const projectId = z.uuid().safeParse(formValue(formData, "projectId"));
+	const direction = directionSchema.safeParse(formValue(formData, "direction"));
 
-	await moveList(listId, user.id, direction);
-	revalidatePath(`/projects/${projectId}`);
+	if (!listId.success || !projectId.success || !direction.success) {
+		return { message: "Invalid list move" };
+	}
+
+	try {
+		const user = await requireCurrentUser();
+		await moveList(listId.data, user.id, direction.data);
+	} catch (error) {
+		console.error("Failed to move list", error);
+		return { message: "Unable to move the column" };
+	}
+
+	revalidatePath(`/projects/${projectId.data}`);
 	revalidatePath("/dashboard");
+	return { message: "Column moved", success: true };
 }

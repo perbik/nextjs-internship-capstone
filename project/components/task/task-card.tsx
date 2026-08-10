@@ -1,14 +1,16 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Calendar } from "lucide-react";
-import type { CSSProperties } from "react";
+import { type CSSProperties, useState } from "react";
+import type { TaskLabelOption } from "@/components/project/project-labels";
 import {
 	type EditableTask,
 	EditTaskModal,
 	type TaskListOption,
 	type TaskMemberOption,
-} from "@/components/modals/create-task-modal";
-import type { TaskLabelOption } from "@/components/project-labels";
+} from "@/components/task/create-task-modal";
+import { TaskActionsMenu } from "@/components/task/task-actions-menu";
+import { useUIStore } from "@/stores/ui-store";
 
 interface TaskCardProps {
 	projectId: string;
@@ -24,6 +26,7 @@ interface TaskCardProps {
 	lists: TaskListOption[];
 	members: TaskMemberOption[];
 	labels: TaskLabelOption[];
+	canManageLabels: boolean;
 	bulkMode: boolean;
 	selected: boolean;
 	onToggleSelection: () => void;
@@ -37,11 +40,26 @@ export interface TaskDragData {
 }
 
 const priorityClasses = {
-	low: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-	medium:
-		"bg-blue_munsell-100 text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300",
-	high: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+	low: "bg-[#7cd278]/10 text-[#4db04f] dark:bg-green-900/40 dark:text-green-300",
+	medium: "bg-[#37a5ff]/10 text-[#37a5ff] dark:bg-sky-900/40 dark:text-sky-300",
+	high: "bg-[#ff3737]/10 text-[#ff3737] dark:bg-red-900/40 dark:text-red-300",
 } as const;
+
+const avatarClasses = [
+	"bg-brand",
+	"bg-[#6366f1]",
+	"bg-[#0ea5e9]",
+	"bg-[#4db04f]",
+] as const;
+
+function formatDueDate(value: string | Date) {
+	return new Intl.DateTimeFormat("en-US", {
+		month: "2-digit",
+		day: "2-digit",
+		year: "numeric",
+		timeZone: "UTC",
+	}).format(new Date(value));
+}
 
 export function TaskCard({
 	projectId,
@@ -51,10 +69,14 @@ export function TaskCard({
 	lists,
 	members,
 	labels,
+	canManageLabels,
 	bulkMode,
 	selected,
 	onToggleSelection,
 }: TaskCardProps) {
+	const [actionsOpen, setActionsOpen] = useState(false);
+	const sortableDisabled = dragDisabled || actionsOpen;
+	const openModal = useUIStore((state) => state.openModal);
 	const {
 		attributes,
 		listeners,
@@ -70,7 +92,7 @@ export function TaskCard({
 			listId: task.listId,
 			index,
 		},
-		disabled: dragDisabled,
+		disabled: sortableDisabled,
 	});
 	const style: CSSProperties = {
 		transform: CSS.Transform.toString(transform),
@@ -88,6 +110,14 @@ export function TaskCard({
 				.map((part) => part[0]?.toUpperCase())
 				.join("")
 		: "—";
+	const avatarClass = task.assignee
+		? avatarClasses[
+				assigneeName
+					.split("")
+					.reduce((total, character) => total + character.charCodeAt(0), 0) %
+					avatarClasses.length
+			]
+		: "bg-[#a8a8a8]";
 
 	return (
 		<article
@@ -95,16 +125,32 @@ export function TaskCard({
 			style={style}
 			{...attributes}
 			{...listeners}
-			tabIndex={dragDisabled ? -1 : 0}
+			tabIndex={sortableDisabled ? -1 : 0}
 			aria-label={
 				bulkMode
 					? `${task.title}. ${selected ? "Selected" : "Not selected"}.`
 					: `${task.title}. Drag to reorder or move to another column.`
 			}
-			className={`touch-pan-y rounded-lg border border-french_gray-300 bg-white p-3 transition-[opacity,box-shadow,border-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-300 ${
+			onClick={(event) => {
+				if (
+					bulkMode ||
+					(event.target instanceof HTMLElement &&
+						Boolean(event.target.closest("button, input, label, a")))
+				) {
+					return;
+				}
+
+				openModal(`edit-task:${task.id}`);
+			}}
+			onKeyUp={(event) => {
+				if (event.key === "Enter" && !bulkMode && !actionsOpen) {
+					openModal(`edit-task:${task.id}`);
+				}
+			}}
+			className={`touch-pan-y rounded-xl border border-input bg-card p-3 shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-[opacity,box-shadow,border-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30  bg-control ${
 				bulkMode
 					? "cursor-pointer"
-					: dragDisabled
+					: sortableDisabled
 						? "cursor-default"
 						: "cursor-grab hover:border-blue_munsell-400 hover:shadow-md active:cursor-grabbing"
 			} ${selected ? "border-blue_munsell-500 ring-2 ring-blue_munsell-500/30" : ""} ${isDragging ? "opacity-40" : ""}`}
@@ -120,30 +166,33 @@ export function TaskCard({
 					/>
 				)}
 				<div className="min-w-0">
-					<h3 className="text-sm font-medium text-outer_space-500 dark:text-platinum-500">
+					<h3 className="truncate text-sm font-bold text-foreground ">
 						{task.title}
 					</h3>
-					{!dragDisabled && (
-						<p className="mt-0.5 text-[11px] text-paynes_gray-400 dark:text-french_gray-500">
-							Drag card to move
-						</p>
-					)}
 				</div>
 				{!bulkMode && (
 					<div className="shrink-0">
+						<TaskActionsMenu
+							projectId={projectId}
+							taskId={task.id}
+							taskTitle={task.title}
+							onOpenChange={setActionsOpen}
+						/>
 						<EditTaskModal
 							projectId={projectId}
 							lists={lists}
 							members={members}
 							labels={labels}
+							canManageLabels={canManageLabels}
 							task={task}
+							showTrigger={false}
 						/>
 					</div>
 				)}
 			</div>
 
 			{task.description && (
-				<p className="mt-2 line-clamp-2 text-xs text-paynes_gray-500 dark:text-french_gray-400">
+				<p className="mt-2 line-clamp-2 text-xs leading-[16.5px] text-muted-foreground ">
 					{task.description}
 				</p>
 			)}
@@ -162,32 +211,33 @@ export function TaskCard({
 				</div>
 			)}
 
-			<div className="mt-3 flex items-center justify-between gap-2">
-				<span
-					className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${priorityClasses[task.priority]}`}
-				>
-					{task.priority}
-				</span>
+			<div className="mt-3 flex min-h-8 items-center justify-between gap-2 pt-1">
+				<div className="flex min-w-0 items-center gap-2">
+					<span
+						className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold capitalize ${priorityClasses[task.priority]}`}
+					>
+						{task.priority}
+					</span>
+					{task.dueDate && (
+						<span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+							<Calendar size={11} />
+							{formatDueDate(task.dueDate)}
+						</span>
+					)}
+				</div>
 				<span
 					className="flex min-w-0 items-center gap-1 text-xs text-paynes_gray-500 dark:text-french_gray-400"
 					title={assigneeName}
 				>
 					<span
 						aria-hidden="true"
-						className="flex size-5 shrink-0 items-center justify-center rounded-full bg-blue_munsell-100 text-[9px] font-semibold text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300"
+						className={`flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white ${avatarClass}`}
 					>
 						{assigneeInitials}
 					</span>
-					<span className="max-w-24 truncate">{assigneeName}</span>
+					<span className="sr-only">{assigneeName}</span>
 				</span>
 			</div>
-
-			{task.dueDate && (
-				<p className="mt-2 flex items-center gap-1 text-xs text-paynes_gray-500 dark:text-french_gray-400">
-					<Calendar size={13} />
-					{new Date(task.dueDate).toLocaleDateString()}
-				</p>
-			)}
 		</article>
 	);
 }

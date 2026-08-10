@@ -53,6 +53,9 @@ interface BoardState {
 	cancelDragging: () => void;
 	previewMove: (move: Omit<BoardMove, "id">) => void;
 	queueMove: (move: BoardMove) => void;
+	reorderLists: (sourceListId: string, targetListId: string) => void;
+	confirmListOrder: () => void;
+	revertListOrder: () => void;
 	confirmSnapshot: (moveIds: string[], savedLists: BoardList[]) => void;
 	rejectSnapshot: (moveIds: string[], error: string) => void;
 	clearMoveError: () => void;
@@ -60,6 +63,7 @@ interface BoardState {
 	toggleTaskSelection: (taskId: string) => void;
 	selectTasks: (taskIds: string[]) => void;
 	clearTaskSelection: () => void;
+	removeTask: (taskId: string) => void;
 }
 
 export function moveTaskBetweenLists(
@@ -168,6 +172,32 @@ export const useBoardStore = create<BoardState>()((set) => ({
 			pendingMoves: [...state.pendingMoves, move],
 		})),
 
+	reorderLists: (sourceListId, targetListId) =>
+		set((state) => {
+			const sourceIndex = state.lists.findIndex(
+				(list) => list.id === sourceListId,
+			);
+			const targetIndex = state.lists.findIndex(
+				(list) => list.id === targetListId,
+			);
+
+			if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+				return state;
+			}
+
+			const nextLists = [...state.lists];
+			const [movedList] = nextLists.splice(sourceIndex, 1);
+			nextLists.splice(targetIndex, 0, movedList);
+
+			return {
+				lists: nextLists.map((list, position) => ({ ...list, position })),
+			};
+		}),
+
+	confirmListOrder: () => set((state) => ({ confirmedLists: state.lists })),
+
+	revertListOrder: () => set((state) => ({ lists: state.confirmedLists })),
+
 	confirmSnapshot: (moveIds, savedLists) =>
 		set((state) => {
 			const confirmedIds = new Set(moveIds);
@@ -210,4 +240,17 @@ export const useBoardStore = create<BoardState>()((set) => ({
 		})),
 	selectTasks: (taskIds) => set({ selectedTaskIds: [...new Set(taskIds)] }),
 	clearTaskSelection: () => set({ selectedTaskIds: [] }),
+	removeTask: (taskId) =>
+		set((state) => ({
+			lists: state.lists.map((list) => ({
+				...list,
+				tasks: list.tasks.filter((task) => task.id !== taskId),
+			})),
+			confirmedLists: state.confirmedLists.map((list) => ({
+				...list,
+				tasks: list.tasks.filter((task) => task.id !== taskId),
+			})),
+			pendingMoves: state.pendingMoves.filter((move) => move.taskId !== taskId),
+			selectedTaskIds: state.selectedTaskIds.filter((id) => id !== taskId),
+		})),
 }));

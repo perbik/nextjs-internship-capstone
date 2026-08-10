@@ -1,13 +1,12 @@
-import { ArrowLeft, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AssignProjectTeamForm } from "@/components/assign-project-team-form";
-import { DebouncedSearchInput } from "@/components/debounced-search-input";
-import { KanbanBoard } from "@/components/kanban-board";
-import { ProjectActions } from "@/components/project-actions";
-import { ProjectCollaborators } from "@/components/project-collaborators";
-import { ProjectLabels } from "@/components/project-labels";
-import { ProjectMembersManager } from "@/components/project-members-manager";
+import { KanbanBoard } from "@/components/kanban/kanban-board";
+import { ProjectActions } from "@/components/project/project-actions";
+import { ProjectCollaborators } from "@/components/project/project-collaborators";
+import { ProjectCollaboratorsDialog } from "@/components/project/project-collaborators-dialog";
+import { DebouncedSearchInput } from "@/components/shared/debounced-search-input";
+import { TaskFilters } from "@/components/task/task-filters";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import {
 	getEligibleTeamMembersForProject,
@@ -19,6 +18,12 @@ import { taskFilterSchema } from "@/lib/validations";
 function firstValue(value: string | string[] | undefined) {
 	return Array.isArray(value) ? value[0] : value;
 }
+
+const statusDetails = {
+	active: { label: "Active", classes: "bg-[#2986ff] text-white" },
+	completed: { label: "Completed", classes: "bg-[#66c24b] text-white" },
+	on_hold: { label: "On Hold", classes: "bg-[#ffbb00] text-[#51421a]" },
+} as const;
 
 export default async function ProjectPage({
 	params,
@@ -38,13 +43,10 @@ export default async function ProjectPage({
 	});
 	const filters = parsedFilters.success ? parsedFilters.data : {};
 	const hasFilters = Boolean(filters.q || filters.priority || filters.assignee);
-	const hasDropdownFilters = Boolean(filters.priority || filters.assignee);
 	const user = await requireCurrentUser();
 	const board = await getProjectBoard(projectId, user.id, filters);
 
-	if (!board) {
-		notFound();
-	}
+	if (!board) notFound();
 
 	const { project, membership } = board;
 	const canManage =
@@ -77,10 +79,6 @@ export default async function ProjectPage({
 					.join(" ") || eligibleUser.email,
 			email: eligibleUser.email,
 		}));
-	const matchingTaskCount = project.lists.reduce(
-		(total, list) => total + list.tasks.length,
-		0,
-	);
 	const labels = project.labels.map((label) => ({
 		id: label.id,
 		name: label.name,
@@ -97,28 +95,35 @@ export default async function ProjectPage({
 			})),
 		})),
 	}));
+	const matchingTaskCount = boardLists.reduce(
+		(total, list) => total + list.tasks.length,
+		0,
+	);
+	const status = statusDetails[project.status];
+	const formattedDate = project.dueDate?.toLocaleDateString("en-US", {
+		month: "short",
+		day: "numeric",
+	});
+	const dateLabel = project.dueDate
+		? project.status === "completed"
+			? `Completed on ${formattedDate}`
+			: project.status === "on_hold"
+				? `Paused until ${formattedDate}`
+				: `Due on ${formattedDate}`
+		: "No due date";
 
 	return (
-		<div className="space-y-6">
-			<div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-				<div className="flex items-start gap-3">
-					<Link
-						href="/projects"
-						aria-label="Back to projects"
-						className="rounded-lg p-2 transition-colors hover:bg-platinum-500 dark:hover:bg-paynes_gray-400"
-					>
-						<ArrowLeft size={20} />
-					</Link>
-					<div>
-						<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
-							{project.name}
-						</h1>
-						<p className="mt-1 text-paynes_gray-500 dark:text-french_gray-500">
-							{project.description || "No project description"}
-						</p>
-					</div>
+		<div className="min-w-0 max-w-full space-y-4">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+				<div className="min-w-0 flex-1">
+					<DebouncedSearchInput
+						initialValue={filters.q}
+						placeholder="Search task title or description"
+						maxLength={200}
+						accessibleLabel="Search tasks"
+						variant="pill"
+					/>
 				</div>
-
 				<ProjectActions
 					project={{
 						id: project.id,
@@ -129,93 +134,56 @@ export default async function ProjectPage({
 					}}
 					canManage={canManage}
 					canDelete={canDelete}
+					variant="manage"
+					labels={labels}
 				/>
 			</div>
 
-			<ProjectCollaborators members={members} />
-			{canDelete && !project.teamId && (
-				<AssignProjectTeamForm projectId={project.id} teams={manageableTeams} />
-			)}
-			{(membership?.role === "owner" || membership?.role === "admin") && (
-				<ProjectMembersManager
-					projectId={project.id}
-					members={members}
-					actorRole={membership.role}
-					eligibleMembers={availableTeamMembers}
-				/>
-			)}
-			<ProjectLabels
-				projectId={project.id}
-				labels={labels}
-				canManage={canManage}
-			/>
-
-			<form
-				action={`/projects/${project.id}`}
-				className="grid gap-3 rounded-xl border border-french_gray-300 bg-white p-4 md:grid-cols-[minmax(14rem,1fr)_10rem_13rem_auto] dark:border-paynes_gray-400 dark:bg-outer_space-500"
-			>
-				<DebouncedSearchInput
-					initialValue={filters.q}
-					placeholder="Search task title or description"
-					maxLength={200}
-					accessibleLabel="Search tasks"
-				/>
-
-				<label>
-					<span className="sr-only">Filter by task priority</span>
-					<select
-						name="priority"
-						defaultValue={filters.priority ?? ""}
-						className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
+			<section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_6px_rgba(0,0,0,0.06)]  ">
+				<div className="flex items-center justify-between border-b border-border px-4 py-2.5 ">
+					<Link
+						href="/projects"
+						className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-muted px-3 text-sm font-semibold text-muted-foreground hover:text-brand  dark:bg-card/5"
 					>
-						<option value="">All priorities</option>
-						<option value="low">Low</option>
-						<option value="medium">Medium</option>
-						<option value="high">High</option>
-					</select>
-				</label>
-
-				<label>
-					<span className="sr-only">Filter by task assignee</span>
-					<select
-						name="assignee"
-						defaultValue={filters.assignee ?? ""}
-						className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
+						<ArrowLeft size={14} />
+						Back
+					</Link>
+					<span
+						className={`rounded-full px-4 py-1.5 text-sm font-bold ${status.classes}`}
 					>
-						<option value="">All assignees</option>
-						<option value="me">Assigned to me</option>
-						<option value="unassigned">Unassigned</option>
-						{members.map((member) => (
-							<option key={member.id} value={member.id}>
-								{member.name}
-								{member.isCurrentUser ? " (You)" : ""}
-							</option>
-						))}
-					</select>
-				</label>
-
-				<div className="flex gap-2">
-					<button
-						type="submit"
-						className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue_munsell-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue_munsell-600"
-					>
-						<SlidersHorizontal size={16} />
-						Apply
-					</button>
-					{hasDropdownFilters && (
-						<Link
-							href={`/projects/${project.id}`}
-							className="inline-flex items-center justify-center gap-2 rounded-lg border border-french_gray-300 px-3 text-sm text-paynes_gray-500 hover:bg-platinum-500 dark:border-paynes_gray-400 dark:text-french_gray-400 dark:hover:bg-paynes_gray-400"
-						>
-							<RotateCcw size={16} />
-							Reset filters
-						</Link>
-					)}
+						{status.label}
+					</span>
 				</div>
-			</form>
+
+				<div className="px-5 py-4">
+					<h1 className="font-display text-3xl font-extrabold tracking-[-0.75px] text-foreground ">
+						{project.name}
+					</h1>
+					<p className="mt-1.5 text-sm text-muted-foreground">
+						{project.description || "No project description"}
+					</p>
+				</div>
+
+				<div className="flex flex-col gap-3 border-t border-border px-5 py-3 sm:flex-row sm:items-center ">
+					<ProjectCollaborators members={members} variant="stack" />
+					{canManage && membership && (
+						<ProjectCollaboratorsDialog
+							projectId={project.id}
+							members={members}
+							actorRole={membership.role as "owner" | "admin"}
+							eligibleMembers={availableTeamMembers}
+							manageableTeams={manageableTeams}
+							showTeamAssignment={canDelete && !project.teamId}
+						/>
+					)}
+					<span className="rounded-full bg-[#4c99ff]/13 px-4 py-2 text-sm font-semibold text-[#1a4fa0]">
+						{dateLabel}
+					</span>
+				</div>
+			</section>
 
 			{hasFilters && (
-				<p className="text-sm text-paynes_gray-500 dark:text-french_gray-400">
+				<p className="text-sm text-muted-foreground">
 					Showing {matchingTaskCount} matching{" "}
 					{matchingTaskCount === 1 ? "task" : "tasks"}
 				</p>
@@ -228,6 +196,15 @@ export default async function ProjectPage({
 				labels={labels}
 				canManage={canManage}
 				dragEnabled={!hasFilters}
+				filterControl={
+					<TaskFilters
+						key="project-task-filters"
+						projectId={project.id}
+						priority={filters.priority}
+						assignee={filters.assignee}
+						members={members}
+					/>
+				}
 			/>
 		</div>
 	);

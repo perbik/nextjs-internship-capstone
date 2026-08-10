@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import {
 	assignProjectToTeam,
@@ -20,6 +21,8 @@ export interface ProjectActionState {
 	success?: boolean;
 	errors?: Record<string, string[]>;
 }
+
+const projectIdSchema = z.uuid("Project must be a valid ID");
 
 function formValue(formData: FormData, key: string) {
 	const value = formData.get(key);
@@ -80,7 +83,7 @@ export async function updateProjectAction(
 	_previousState: ProjectActionState,
 	formData: FormData,
 ): Promise<ProjectActionState> {
-	const projectId = formValue(formData, "projectId");
+	const projectId = projectIdSchema.safeParse(formValue(formData, "projectId"));
 	const parsed = projectUpdateSchema.safeParse({
 		name: formValue(formData, "name"),
 		description: formValue(formData, "description"),
@@ -88,8 +91,8 @@ export async function updateProjectAction(
 		dueDate: formValue(formData, "dueDate"),
 	});
 
-	if (!projectId) {
-		return { message: "Project ID is required" };
+	if (!projectId.success) {
+		return { message: "Invalid project ID" };
 	}
 
 	if (!parsed.success) {
@@ -101,7 +104,7 @@ export async function updateProjectAction(
 
 	try {
 		const user = await requireCurrentUser();
-		await updateProject(projectId, user.id, {
+		await updateProject(projectId.data, user.id, {
 			...parsed.data,
 			description: parsed.data.description ?? null,
 			dueDate: parsed.data.dueDate ?? null,
@@ -115,20 +118,28 @@ export async function updateProjectAction(
 
 	revalidatePath("/dashboard");
 	revalidatePath("/projects");
-	revalidatePath(`/projects/${projectId}`);
+	revalidatePath(`/projects/${projectId.data}`);
 
 	return { message: "Project updated successfully", success: true };
 }
 
-export async function deleteProjectAction(formData: FormData) {
-	const projectId = formValue(formData, "projectId");
+export async function deleteProjectAction(
+	_previousState: ProjectActionState,
+	formData: FormData,
+): Promise<ProjectActionState> {
+	const projectId = projectIdSchema.safeParse(formValue(formData, "projectId"));
 
-	if (!projectId) {
-		throw new Error("Project ID is required");
+	if (!projectId.success) {
+		return { message: "Invalid project ID" };
 	}
 
-	const user = await requireCurrentUser();
-	await softDeleteProject(projectId, user.id);
+	try {
+		const user = await requireCurrentUser();
+		await softDeleteProject(projectId.data, user.id);
+	} catch (error) {
+		console.error("Failed to delete project", error);
+		return { message: "Unable to delete the project" };
+	}
 
 	revalidatePath("/dashboard");
 	revalidatePath("/projects");

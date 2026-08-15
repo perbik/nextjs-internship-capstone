@@ -2,7 +2,7 @@ import { SettingsContent } from "@/components/settings/settings-content";
 
 export default function SettingsPage() {
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-5">
+		<div className="w-full space-y-5">
 			<header>
 				<h1 className="font-display text-3xl font-extrabold tracking-[-0.03em] text-foreground sm:text-4xl">
 					Account &amp; security

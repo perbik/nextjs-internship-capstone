@@ -1,5 +1,3 @@
-"use client";
-
 import { UserProfile } from "@clerk/nextjs";
 
 export function SettingsContent() {
@@ -8,6 +6,7 @@ export function SettingsContent() {
 			className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_6px_rgba(0,0,0,0.06)]"
 			aria-label="Account settings"
 		>
+			{/* Keep Clerk sections inside the single embedded settings route */}
 			<UserProfile
 				routing="hash"
 				appearance={{

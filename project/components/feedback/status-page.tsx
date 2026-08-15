@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 interface StatusPageProps {
@@ -16,42 +17,33 @@ export function StatusPage({
 	children,
 }: StatusPageProps) {
 	return (
-		<main className="relative flex min-h-svh items-center justify-center overflow-hidden bg-background px-4 py-10 dark:bg-background sm:px-6">
-			<div
-				aria-hidden="true"
-				className="absolute -top-36 -right-28 size-96 rounded-full bg-brand/10 blur-3xl dark:bg-brand/8"
-			/>
-			<div
-				aria-hidden="true"
-				className="absolute -bottom-44 -left-24 size-[28rem] rounded-full bg-brand/8 blur-3xl dark:bg-brand/5"
-			/>
-
-			<section className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-border bg-card shadow-[0_24px_80px_rgba(0,0,0,0.08)]   dark:shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-				<div className="h-1.5 bg-brand" />
-				<div className="px-6 py-8 sm:px-10 sm:py-10">
-					<a
+		<div className="flex min-h-[calc(100svh-5rem)] items-center justify-center bg-background px-4 py-6 sm:px-6">
+			<section className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+				<div className="h-1 bg-brand" />
+				<div className="px-6 py-7 sm:px-8 sm:py-8">
+					<Link
 						href="/"
-						className="inline-flex font-display text-xl font-extrabold tracking-[-0.5px] text-foreground "
+						className="inline-flex rounded-sm font-display text-xl font-extrabold tracking-[-0.5px] text-foreground transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 					>
 						Brix
-					</a>
+					</Link>
 
-					<div className="mt-12 flex size-14 items-center justify-center rounded-2xl bg-brand/10 text-brand">
+					<div className="mt-8 flex size-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
 						{icon}
 					</div>
-					<p className="mt-6 text-sm font-bold tracking-[0.16em] text-brand uppercase">
+					<p className="mt-5 text-xs font-bold tracking-[0.16em] text-brand uppercase">
 						{code}
 					</p>
-					<h1 className="mt-2 font-display text-3xl font-extrabold tracking-[-0.04em] text-foreground sm:text-4xl ">
+					<h1 className="mt-2 font-display text-3xl font-extrabold tracking-[-0.04em] text-foreground">
 						{title}
 					</h1>
-					<p className="mt-4 max-w-md text-base leading-7 text-muted-foreground ">
+					<p className="mt-4 max-w-md text-base leading-7 text-muted-foreground">
 						{description}
 					</p>
 
-					<div className="mt-8 flex flex-col gap-3 sm:flex-row">{children}</div>
+					<div className="mt-7 flex flex-col gap-3 sm:flex-row">{children}</div>
 				</div>
 			</section>
-		</main>
+		</div>
 	);
 }

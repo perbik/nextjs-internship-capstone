@@ -3,12 +3,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const calendarDays = Array.from({ length: 42 }, (_, index) => index);
-const deadlineRows = ["first", "second", "third", "fourth", "fifth"];
+const deadlineRows = ["first", "second", "third", "fourth"];
 
 export function CalendarSkeleton() {
 	return (
 		<div
-			className="space-y-6"
+			className="space-y-5"
 			role="status"
 			aria-label="Loading calendar"
 			aria-busy="true"
@@ -37,11 +37,21 @@ export function CalendarSkeleton() {
 					</div>
 				</div>
 			</div>
-			<div className="space-y-3">
-				<Skeleton className="h-6 w-56" />
+			<div className="mb-6 space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-5">
+				<div className="flex items-center justify-between gap-3">
+					<div className="flex items-center gap-2">
+						<Skeleton className="h-6 w-48" />
+						<Skeleton className="size-6 rounded-full" />
+					</div>
+					<div className="flex items-center gap-2">
+						<Skeleton className="size-8 rounded-full" />
+						<Skeleton className="h-4 w-10" />
+						<Skeleton className="size-8 rounded-full" />
+					</div>
+				</div>
 				<div className="space-y-2">
 					{deadlineRows.map((row) => (
-						<Skeleton key={row} className="h-12 w-full rounded-xl" />
+						<Skeleton key={row} className="h-16 w-full rounded-xl" />
 					))}
 				</div>
 			</div>

@@ -10,31 +10,32 @@ export function BoardSkeleton() {
 			aria-label="Loading project board"
 			aria-busy="true"
 		>
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-				<Skeleton className="h-11 min-w-0 flex-1 rounded-full" />
-				<Skeleton className="h-11 w-full rounded-full sm:w-44" />
-			</div>
-
-			<section className="overflow-hidden rounded-2xl border border-border bg-card">
-				<div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-					<Skeleton className="h-8 w-24 rounded-lg" />
-					<Skeleton className="h-8 w-20 rounded-full" />
-				</div>
-				<div className="space-y-2 px-5 py-4">
-					<Skeleton className="h-9 w-52 max-w-full" />
-					<Skeleton className="h-4 w-80 max-w-full" />
-				</div>
-				<div className="flex items-center gap-3 border-t border-border px-5 py-3">
-					<Skeleton className="h-9 w-32 rounded-full" />
-					<Skeleton className="ml-auto h-9 w-32 rounded-full" />
+			<section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+				<div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+					<div className="flex min-w-0 items-start gap-3">
+						<Skeleton className="size-8 shrink-0 rounded-full" />
+						<div className="min-w-0 space-y-1.5">
+							<div className="flex flex-wrap items-center gap-2">
+								<Skeleton className="h-7 w-44" />
+								<Skeleton className="h-6 w-16 rounded-full" />
+								<Skeleton className="h-7 w-28 rounded-full" />
+							</div>
+							<Skeleton className="h-4 w-80 max-w-full" />
+						</div>
+					</div>
+					<div className="flex items-center gap-2">
+						<Skeleton className="h-8 w-24 rounded-full" />
+						<Skeleton className="h-8 w-36 rounded-full" />
+						<Skeleton className="h-8 w-28 rounded-full" />
+					</div>
 				</div>
 			</section>
 
 			<div className="min-w-0 max-w-full overflow-hidden rounded-2xl bg-board">
 				<div className="flex min-h-17 items-center justify-between gap-3 px-5 py-4">
-					<div className="flex gap-3">
-						<Skeleton className="h-10 w-28 rounded-full" />
-						<Skeleton className="h-10 w-28 rounded-full" />
+					<div className="flex flex-wrap gap-2">
+						<Skeleton className="h-8 w-24 rounded-full" />
+						<Skeleton className="h-8 w-44 rounded-full" />
 					</div>
 					<Skeleton className="size-10 rounded-full" />
 				</div>

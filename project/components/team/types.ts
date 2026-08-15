@@ -14,5 +14,6 @@ export interface ManagedTeam {
 		email: string;
 		role: "owner" | "admin" | "member";
 		isCurrentUser: boolean;
+		projectCount?: number;
 	}>;
 }

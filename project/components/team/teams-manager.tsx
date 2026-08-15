@@ -2,48 +2,60 @@
 
 import { ArrowRight, Search, Users } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { SearchBar } from "@/components/shared/search-bar";
 import { CreateTeamDialog } from "@/components/team/create-team-dialog";
 import type { ManagedTeam } from "@/components/team/types";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import {
+	Pagination,
+	PaginationContent,
+	PaginationItem,
+	PaginationLink,
+	PaginationNext,
+	PaginationPrevious,
+} from "@/components/ui/pagination";
 
-export function TeamsManager({ teams }: { teams: ManagedTeam[] }) {
-	const [query, setQuery] = useState("");
-	const filteredTeams = useMemo(() => {
-		const normalizedQuery = query.trim().toLowerCase();
-		if (!normalizedQuery) return teams;
-		return teams.filter((team) =>
-			[
-				team.name,
-				team.description ?? "",
-				...team.projects.map((project) => project.name),
-				...team.members.flatMap((member) => [member.name, member.email]),
-			].some((value) => value.toLowerCase().includes(normalizedQuery)),
-		);
-	}, [query, teams]);
+interface TeamsManagerProps {
+	teams: ManagedTeam[];
+	query: string;
+	page: number;
+	totalPages: number;
+	totalTeams: number;
+}
 
+// A new search always starts on the first page
+const TEAM_SEARCH_RESET_PARAMS = ["page"];
+
+export function TeamsManager({
+	teams,
+	query,
+	page,
+	totalPages,
+	totalTeams,
+}: TeamsManagerProps) {
 	return (
 		<div className="space-y-5">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-				<div className="relative w-full sm:max-w-80">
-					<Search
-						size={17}
-						className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-					/>
-					<Input
-						value={query}
-						onChange={(event) => setQuery(event.target.value)}
+				<div className="w-full sm:max-w-80">
+					<SearchBar
+						initialValue={query}
 						placeholder="Search teams"
-						aria-label="Search teams"
-						className="h-11 rounded-full border-border bg-card pl-11 shadow-none"
+						maxLength={200}
+						accessibleLabel="Search teams"
+						variant="pill"
+						resetParams={TEAM_SEARCH_RESET_PARAMS}
 					/>
 				</div>
 				<CreateTeamDialog />
 			</div>
 
-			{teams.length === 0 ? (
+			{query && teams.length === 0 ? (
+				<Card className="rounded-2xl border-border bg-card p-10 text-center shadow-none">
+					<Search className="mx-auto text-muted-foreground" size={28} />
+					<p className="mt-3 text-sm font-semibold">No teams match "{query}"</p>
+				</Card>
+			) : totalTeams === 0 ? (
 				<Card className="rounded-2xl border-dashed border-input bg-card p-10 text-center shadow-none">
 					<Users className="mx-auto text-brand" size={30} />
 					<h2 className="mt-3 font-bold">Create your first team</h2>
@@ -51,27 +63,62 @@ export function TeamsManager({ teams }: { teams: ManagedTeam[] }) {
 						Projects require a team before collaborators can be invited.
 					</p>
 				</Card>
-			) : filteredTeams.length === 0 ? (
+			) : teams.length === 0 ? (
 				<Card className="rounded-2xl border-border bg-card p-10 text-center shadow-none">
 					<Search className="mx-auto text-muted-foreground" size={28} />
 					<p className="mt-3 text-sm font-semibold">No teams match “{query}”</p>
 				</Card>
 			) : (
-				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-					{filteredTeams.map((team) => (
-						<TeamSummaryCard key={team.id} team={team} />
-					))}
-				</div>
+				<>
+					<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+						{teams.map((team) => (
+							<TeamSummaryCard key={team.id} team={team} />
+						))}
+					</div>
+					{totalPages > 1 && (
+						<Pagination>
+							<PaginationContent>
+								<PaginationItem>
+									<PaginationPrevious
+										href={teamPageHref(page - 1, query)}
+										disabled={page === 1}
+									/>
+								</PaginationItem>
+								<PaginationItem>
+									<PaginationLink
+										href={teamPageHref(page, query)}
+										isActive
+										aria-label={`Page ${page} of ${totalPages}`}
+									>
+										{page}
+									</PaginationLink>
+								</PaginationItem>
+								<PaginationItem>
+									<PaginationNext
+										href={teamPageHref(page + 1, query)}
+										disabled={page === totalPages}
+									/>
+								</PaginationItem>
+							</PaginationContent>
+						</Pagination>
+					)}
+				</>
 			)}
 		</div>
 	);
 }
 
-function TeamSummaryCard({ team }: { team: ManagedTeam }) {
-	const activeProjects = team.projects.filter(
-		(project) => project.status === "active",
-	).length;
+function teamPageHref(page: number, query: string) {
+	// Keep the current search when moving between result pages
+	const params = new URLSearchParams();
+	if (query) params.set("q", query);
+	if (page > 1) params.set("page", String(page));
 
+	const search = params.toString();
+	return search ? `/team?${search}` : "/team";
+}
+
+function TeamSummaryCard({ team }: { team: ManagedTeam }) {
 	return (
 		<Link href={`/team/${team.id}`} className="group block h-full">
 			<Card className="flex h-full min-h-48 flex-col rounded-2xl border-border bg-card p-5 shadow-[0_1px_8px_rgba(0,0,0,.04)] transition-all group-hover:-translate-y-0.5 group-hover:border-brand/30 group-hover:shadow-[0_10px_25px_rgba(0,0,0,.08)]  ">
@@ -93,7 +140,7 @@ function TeamSummaryCard({ team }: { team: ManagedTeam }) {
 					<p className="text-xs text-muted-foreground">
 						{team.members.length}{" "}
 						{team.members.length === 1 ? "member" : "members"} ·{" "}
-						{activeProjects} active · {team.projects.length}{" "}
+						{team.projects.length}{" "}
 						{team.projects.length === 1 ? "project" : "projects"}
 					</p>
 					<ArrowRight

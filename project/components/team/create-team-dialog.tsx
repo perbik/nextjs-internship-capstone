@@ -4,10 +4,8 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createTeamAction } from "@/app/(dashboard)/team/actions";
-import {
-	initialTeamActionState,
-	TeamActionStatus,
-} from "@/components/team/shared";
+import { TeamActionStatus } from "@/components/team/team-action-status";
+import { initialTeamActionState } from "@/components/team/utils";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -20,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TextareaWithCounter } from "@/components/ui/textarea-with-counter";
 
 export function CreateTeamDialog() {
 	const router = useRouter();
@@ -30,12 +29,13 @@ export function CreateTeamDialog() {
 		initialTeamActionState,
 	);
 
+	// Clear the form and reload team data after each successful creation
 	useEffect(() => {
 		if (!state.success) return;
 		formRef.current?.reset();
 		setOpen(false);
 		router.refresh();
-	}, [router, state.success]);
+	}, [router, state]);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
@@ -44,11 +44,11 @@ export function CreateTeamDialog() {
 					<Plus /> Create Team
 				</Button>
 			</DialogTrigger>
-			<DialogContent className="sm:max-w-[480px]">
+			<DialogContent className="sm:max-w-120">
 				<DialogHeader>
 					<DialogTitle>Create a team</DialogTitle>
 					<DialogDescription>
-						Create a workspace for members and their shared projects.
+						Create a team for members and their shared projects.
 					</DialogDescription>
 				</DialogHeader>
 				<form ref={formRef} action={action} className="space-y-4">
@@ -65,12 +65,12 @@ export function CreateTeamDialog() {
 					</div>
 					<div className="space-y-2">
 						<Label htmlFor="team-description">Description</Label>
-						<Input
+						<TextareaWithCounter
 							id="team-description"
 							name="description"
 							maxLength={500}
+							rows={3}
 							placeholder="What does this team work on?"
-							className="h-11"
 						/>
 					</div>
 					<TeamActionStatus state={state} />

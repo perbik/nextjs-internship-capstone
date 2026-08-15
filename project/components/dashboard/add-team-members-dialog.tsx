@@ -1,11 +1,10 @@
 "use client";
 
 import { Mail, Plus, UserPlus } from "lucide-react";
-import { useActionState, useEffect, useMemo, useState } from "react";
-import {
-	addTeamMemberAction,
-	type TeamActionState,
-} from "@/app/(dashboard)/team/actions";
+import { useActionState, useEffect, useId, useState } from "react";
+import { addTeamMemberAction } from "@/app/(dashboard)/team/actions";
+import { TeamActionStatus } from "@/components/team/team-action-status";
+import { initialTeamActionState } from "@/components/team/utils";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -26,24 +25,20 @@ interface ManageableTeamOption {
 	role: "owner" | "admin" | "member";
 }
 
-const initialState: TeamActionState = { message: "" };
-
-export function AddTeamMemberDialog({
-	teams,
-}: {
+interface AddTeamMemberDialogProps {
 	teams: ManageableTeamOption[];
-}) {
+}
+
+export function AddTeamMemberDialog({ teams }: AddTeamMemberDialogProps) {
+	const formId = useId();
 	const [open, setOpen] = useState(false);
 	const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
 	const [role, setRole] = useState<"admin" | "member">("member");
 	const [state, action, pending] = useActionState(
 		addTeamMemberAction,
-		initialState,
+		initialTeamActionState,
 	);
-	const selectedTeam = useMemo(
-		() => teams.find((team) => team.id === teamId),
-		[teamId, teams],
-	);
+	const selectedTeam = teams.find((team) => team.id === teamId);
 
 	useEffect(() => {
 		if (selectedTeam?.role !== "owner" && role === "admin") {
@@ -56,21 +51,22 @@ export function AddTeamMemberDialog({
 			setOpen(false);
 			setRole("member");
 		}
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<button
+				<Button
 					type="button"
+					variant="outline"
 					disabled={teams.length === 0}
-					className="flex h-16.25 w-full items-center gap-3 rounded-xl border border-border bg-surface-subtle px-4 py-3 text-left text-sm font-semibold text-foreground hover:border-brand/30 hover:bg-brand/5 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-brand/10"
+					className="h-20 w-full justify-start gap-3 rounded-xl border-border bg-surface-subtle px-4 py-3 text-left text-sm text-foreground hover:border-brand/30 hover:bg-brand/5 dark:hover:bg-brand/10"
 				>
 					<span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
 						<Plus size={14} />
 					</span>
 					Add Team Member
-				</button>
+				</Button>
 			</DialogTrigger>
 
 			<DialogContent className="sm:max-w-xl">
@@ -85,9 +81,9 @@ export function AddTeamMemberDialog({
 					<input type="hidden" name="role" value={role} />
 
 					<div className="space-y-2">
-						<Label htmlFor="quick-member-team">Team</Label>
+						<Label htmlFor={`${formId}-team`}>Team</Label>
 						<FormSelect
-							id="quick-member-team"
+							id={`${formId}-team`}
 							name="teamId"
 							value={teamId}
 							onValueChange={setTeamId}
@@ -100,14 +96,14 @@ export function AddTeamMemberDialog({
 					</div>
 
 					<div className="space-y-2">
-						<Label htmlFor="quick-member-email">Member email</Label>
+						<Label htmlFor={`${formId}-email`}>Member email</Label>
 						<div className="relative">
 							<Mail
 								size={15}
 								className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
 							/>
 							<Input
-								id="quick-member-email"
+								id={`${formId}-email`}
 								name="email"
 								type="email"
 								required
@@ -119,9 +115,9 @@ export function AddTeamMemberDialog({
 					</div>
 
 					<div className="space-y-2">
-						<Label htmlFor="quick-member-role">Role</Label>
+						<Label htmlFor={`${formId}-role`}>Role</Label>
 						<FormSelect
-							id="quick-member-role"
+							id={`${formId}-role`}
 							value={role}
 							onValueChange={(value) => setRole(value as "admin" | "member")}
 							options={[
@@ -140,14 +136,7 @@ export function AddTeamMemberDialog({
 						)}
 					</div>
 
-					{state.message && (
-						<p
-							className={`text-sm font-semibold ${state.success ? "text-green-700" : "text-red-600"}`}
-							role="status"
-						>
-							{state.message}
-						</p>
-					)}
+					<TeamActionStatus state={state} />
 
 					<DialogFooter>
 						<Button

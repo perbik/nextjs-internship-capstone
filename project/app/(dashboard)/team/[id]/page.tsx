@@ -1,20 +1,14 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { forbidden, notFound } from "next/navigation";
+import { z } from "zod";
 import { TeamDetails } from "@/components/team/team-details";
 import { Button } from "@/components/ui/button";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { getTeamsForUser } from "@/lib/db/queries";
+import { getTeamForUser } from "@/lib/db/queries";
+import { getUserDisplayName } from "@/lib/user-utils";
 
-function nameOf(user: {
-	firstName: string | null;
-	lastName: string | null;
-	email: string;
-}) {
-	return (
-		[user.firstName, user.lastName].filter(Boolean).join(" ") || user.email
-	);
-}
+const teamIdSchema = z.uuid();
 
 export default async function TeamDetailsPage({
 	params,
@@ -25,9 +19,12 @@ export default async function TeamDetailsPage({
 		params,
 		requireCurrentUser(),
 	]);
-	const teams = await getTeamsForUser(currentUser.id);
-	const result = teams.find(({ team }) => team.id === id);
-	if (!result) notFound();
+	const parsedTeamId = teamIdSchema.safeParse(id);
+	if (!parsedTeamId.success) notFound();
+
+	// The query returns the team only when the current user is a member
+	const result = await getTeamForUser(currentUser.id, parsedTeamId.data);
+	if (!result) forbidden();
 
 	const { team, role, members, projects } = result;
 	const managedTeam = {
@@ -40,34 +37,28 @@ export default async function TeamDetailsPage({
 			name: project.name,
 			status: project.status,
 		})),
-		members: members.map(({ membership, user }) => ({
+		// Send only the team fields needed by the client
+		members: members.map(({ membership, user, projectCount }) => ({
 			id: user.id,
-			name: nameOf(user),
+			name: getUserDisplayName(user),
 			email: user.email,
 			role: membership.role,
 			isCurrentUser: user.id === currentUser.id,
+			projectCount,
 		})),
 	};
 
 	return (
-		<div className="space-y-6">
-			<div>
-				<Button
-					variant="ghost"
-					asChild
-					className="-ml-3 mb-3 rounded-full text-muted-foreground hover:text-brand"
-				>
-					<Link href="/team">
-						<ArrowLeft /> Back to Teams
-					</Link>
-				</Button>
-				<h1 className="font-display text-3xl font-extrabold tracking-[-0.03em] text-foreground sm:text-4xl dark:text-white">
-					{team.name}
-				</h1>
-				<p className="mt-2 text-sm text-muted-foreground sm:text-base">
-					Manage projects, members, access, and permissions for this team
-				</p>
-			</div>
+		<div className="space-y-3">
+			<Button
+				variant="ghost"
+				asChild
+				className="-ml-3 rounded-full text-muted-foreground hover:text-brand"
+			>
+				<Link href="/team">
+					<ArrowLeft /> Back to Teams
+				</Link>
+			</Button>
 			<TeamDetails team={managedTeam} />
 		</div>
 	);

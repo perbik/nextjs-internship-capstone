@@ -1,125 +1,140 @@
-import { Filter, Plus, Search } from "lucide-react";
+import { FolderOpen, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import Link from "next/link";
+import { DebouncedSearchInput } from "@/components/debounced-search-input";
+import { CreateProjectModal } from "@/components/modals/create-project-modal";
+import { ProjectGrid } from "@/components/project-grid";
+import { requireCurrentUser } from "@/lib/auth/current-user";
+import { getProjectSummariesForUser } from "@/lib/db/queries";
+import { projectFilterSchema } from "@/lib/validations";
 
-export default function ProjectsPage() {
+function firstValue(value: string | string[] | undefined) {
+	return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function ProjectsPage({
+	searchParams,
+}: {
+	searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+	const rawFilters = await searchParams;
+	const parsedFilters = projectFilterSchema.safeParse({
+		q: firstValue(rawFilters.q),
+		status: firstValue(rawFilters.status),
+		role: firstValue(rawFilters.role),
+	});
+	const filters = parsedFilters.success ? parsedFilters.data : {};
+	const hasFilters = Boolean(filters.q || filters.status || filters.role);
+	const hasDropdownFilters = Boolean(filters.status || filters.role);
+	const user = await requireCurrentUser();
+	const projects = await getProjectSummariesForUser(user.id, filters);
+
 	return (
 		<div className="space-y-6">
-			<div className="flex justify-between items-center">
-				<div>
-					<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
-						Projects
-					</h1>
-					<p className="text-paynes_gray-500 dark:text-french_gray-500 mt-2">
-						Manage and organize your team projects
-					</p>
-				</div>
-				<button
-					type="button"
-					className="inline-flex items-center px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors"
-				>
-					<Plus size={20} className="mr-2" />
-					New Project
-				</button>
-			</div>
-
-			{/* Implementation Tasks Banner */}
-			<div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-				<h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
-					📋 Projects Page Implementation Tasks
-				</h3>
-				<ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
-					<li>• Task 4.1: Implement project CRUD operations</li>
-					<li>• Task 4.2: Create project listing and dashboard interface</li>
-					<li>• Task 4.5: Design and implement project cards and layouts</li>
-					<li>
-						• Task 4.6: Add project and task search/filtering capabilities
-					</li>
-				</ul>
-			</div>
-
-			{/* Search and Filter Bar */}
-			<div className="flex flex-col sm:flex-row gap-4">
-				<div className="relative flex-1">
-					<Search
-						className="absolute left-3 top-1/2 transform -translate-y-1/2 text-paynes_gray-500 dark:text-french_gray-400"
-						size={16}
-					/>
-					<input
-						type="text"
-						placeholder="Search projects..."
-						className="w-full pl-10 pr-4 py-2 bg-white dark:bg-outer_space-500 border border-french_gray-300 dark:border-paynes_gray-400 rounded-lg text-outer_space-500 dark:text-platinum-500 placeholder-paynes_gray-500 dark:placeholder-french_gray-400 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500"
-					/>
-				</div>
-				<button
-					type="button"
-					className="inline-flex items-center px-4 py-2 border border-french_gray-300 dark:border-paynes_gray-400 text-outer_space-500 dark:text-platinum-500 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 transition-colors"
-				>
-					<Filter size={16} className="mr-2" />
-					Filter
-				</button>
-			</div>
-
-			{/* Projects Grid Placeholder */}
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-				{[1, 2, 3, 4, 5, 6].map((i) => (
-					<div
-						key={i}
-						className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6 hover:shadow-lg transition-shadow"
-					>
-						<div className="flex items-start justify-between mb-4">
-							<div className="w-3 h-3 bg-blue_munsell-500 rounded-full"></div>
-							<div className="text-sm text-paynes_gray-500 dark:text-french_gray-400">
-								{Math.floor(Math.random() * 30) + 1} days left
-							</div>
-						</div>
-
-						<h3 className="text-lg font-semibold text-outer_space-500 dark:text-platinum-500 mb-2">
-							Sample Project {i}
-						</h3>
-
-						<p className="text-sm text-paynes_gray-500 dark:text-french_gray-400 mb-4">
-							This is a placeholder project description that will be replaced
-							with actual project data.
+			<div className="rounded-xl border border-french_gray-300 bg-white p-5 sm:p-6 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+				<div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+					<div>
+						<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
+							Projects
+						</h1>
+						<p className="mt-2 text-paynes_gray-500 dark:text-french_gray-500">
+							{projects.length === 0
+								? "Create your first project to start organizing work."
+								: `${projects.length} ${projects.length === 1 ? "project" : "projects"} available to you.`}
 						</p>
-
-						<div className="flex items-center justify-between text-sm text-paynes_gray-500 dark:text-french_gray-400 mb-4">
-							<span>{Math.floor(Math.random() * 8) + 2} members</span>
-							<span>{Math.floor(Math.random() * 20) + 5} tasks</span>
-						</div>
-
-						<div className="w-full bg-french_gray-300 dark:bg-paynes_gray-400 rounded-full h-2">
-							<div
-								className="bg-blue_munsell-500 h-2 rounded-full"
-								style={{ width: `${Math.floor(Math.random() * 80) + 20}%` }}
-							></div>
-						</div>
 					</div>
-				))}
-			</div>
-
-			{/* Component Placeholders */}
-			<div className="mt-8 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-				<h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
-					📁 Components to Implement
-				</h3>
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
-					<div>
-						<strong>components/project-card.tsx</strong>
-						<p>Project display component with progress, members, and actions</p>
-					</div>
-					<div>
-						<strong>components/modals/create-project-modal.tsx</strong>
-						<p>Modal for creating new projects with form validation</p>
-					</div>
-					<div>
-						<strong>hooks/use-projects.ts</strong>
-						<p>Custom hook for project data fetching and mutations</p>
-					</div>
-					<div>
-						<strong>lib/db/schema.ts</strong>
-						<p>Database schema for projects, lists, and tasks</p>
-					</div>
+					<CreateProjectModal />
 				</div>
 			</div>
+
+			<form
+				action="/projects"
+				className="grid gap-3 rounded-xl border border-french_gray-300 bg-white p-4 md:grid-cols-[minmax(14rem,1fr)_11rem_11rem_auto] dark:border-paynes_gray-400 dark:bg-outer_space-500"
+			>
+				<DebouncedSearchInput
+					initialValue={filters.q}
+					placeholder="Search name or description"
+					maxLength={100}
+					accessibleLabel="Search projects"
+				/>
+
+				<label>
+					<span className="sr-only">Filter by project status</span>
+					<select
+						name="status"
+						defaultValue={filters.status ?? ""}
+						className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
+					>
+						<option value="">All statuses</option>
+						<option value="active">Active</option>
+						<option value="completed">Completed</option>
+						<option value="on_hold">On hold</option>
+					</select>
+				</label>
+
+				<label>
+					<span className="sr-only">Filter by project role</span>
+					<select
+						name="role"
+						defaultValue={filters.role ?? ""}
+						className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
+					>
+						<option value="">All roles</option>
+						<option value="owner">Owner</option>
+						<option value="admin">Admin</option>
+						<option value="member">Member</option>
+					</select>
+				</label>
+
+				<div className="flex gap-2">
+					<button
+						type="submit"
+						className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue_munsell-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue_munsell-600"
+					>
+						<SlidersHorizontal size={16} />
+						Apply
+					</button>
+					{hasDropdownFilters && (
+						<Link
+							href="/projects"
+							className="inline-flex items-center justify-center gap-2 rounded-lg border border-french_gray-300 px-3 text-sm text-paynes_gray-500 hover:bg-platinum-500 dark:border-paynes_gray-400 dark:text-french_gray-400 dark:hover:bg-paynes_gray-400"
+						>
+							<RotateCcw size={16} />
+							Reset filters
+						</Link>
+					)}
+				</div>
+			</form>
+
+			{projects.length > 0 ? (
+				<div className="space-y-3">
+					<p className="text-sm text-paynes_gray-500 dark:text-french_gray-400">
+						Showing {projects.length} matching{" "}
+						{projects.length === 1 ? "project" : "projects"}
+					</p>
+					<ProjectGrid projects={projects} />
+				</div>
+			) : (
+				<div className="rounded-lg border border-dashed border-french_gray-300 bg-white px-6 py-14 text-center dark:border-paynes_gray-400 dark:bg-outer_space-500">
+					<FolderOpen size={40} className="mx-auto text-blue_munsell-500" />
+					<h2 className="mt-4 text-lg font-semibold text-outer_space-500 dark:text-platinum-500">
+						{hasFilters ? "No matching projects" : "No projects yet"}
+					</h2>
+					<p className="mx-auto mt-2 max-w-md text-sm text-paynes_gray-500 dark:text-french_gray-400">
+						{hasFilters
+							? "Try another search term or clear one of the active filters."
+							: "Your projects will appear here after you create one or join a team project."}
+					</p>
+					{hasFilters && (
+						<Link
+							href="/projects"
+							className="mt-4 inline-flex items-center gap-2 rounded-lg border border-french_gray-300 px-4 py-2 text-sm font-medium text-outer_space-500 hover:bg-platinum-500 dark:border-paynes_gray-400 dark:text-platinum-500 dark:hover:bg-paynes_gray-400"
+						>
+							<X size={16} />
+							Clear filters
+						</Link>
+					)}
+				</div>
+			)}
 		</div>
 	);
 }

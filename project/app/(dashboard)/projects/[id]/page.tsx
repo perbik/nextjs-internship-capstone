@@ -1,169 +1,167 @@
-import {
-	ArrowLeft,
-	Calendar,
-	MoreHorizontal,
-	Settings,
-	Users,
-} from "lucide-react";
+import { ArrowLeft, RotateCcw, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { DebouncedSearchInput } from "@/components/debounced-search-input";
+import { KanbanBoard } from "@/components/kanban-board";
+import { ProjectActions } from "@/components/project-actions";
+import { requireCurrentUser } from "@/lib/auth/current-user";
+import { getProjectBoard } from "@/lib/db/queries";
+import { taskFilterSchema } from "@/lib/validations";
 
-export default function ProjectPage({ params }: { params: { id: string } }) {
+function firstValue(value: string | string[] | undefined) {
+	return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function ProjectPage({
+	params,
+	searchParams,
+}: {
+	params: Promise<{ id: string }>;
+	searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+	const [{ id: projectId }, rawFilters] = await Promise.all([
+		params,
+		searchParams,
+	]);
+	const parsedFilters = taskFilterSchema.safeParse({
+		q: firstValue(rawFilters.q),
+		priority: firstValue(rawFilters.priority),
+		assignee: firstValue(rawFilters.assignee),
+	});
+	const filters = parsedFilters.success ? parsedFilters.data : {};
+	const hasFilters = Boolean(filters.q || filters.priority || filters.assignee);
+	const hasDropdownFilters = Boolean(filters.priority || filters.assignee);
+	const user = await requireCurrentUser();
+	const board = await getProjectBoard(projectId, user.id, filters);
+
+	if (!board) {
+		notFound();
+	}
+
+	const { project, membership } = board;
+	const canManage =
+		membership?.role === "owner" || membership?.role === "admin";
+	const canDelete = project.ownerId === user.id;
+	const members = project.members.map(({ user: member }) => ({
+		id: member.id,
+		name:
+			[member.firstName, member.lastName].filter(Boolean).join(" ") ||
+			member.email,
+	}));
+	const matchingTaskCount = project.lists.reduce(
+		(total, list) => total + list.tasks.length,
+		0,
+	);
+
 	return (
 		<div className="space-y-6">
-			{/* Project Header */}
-			<div className="flex items-center justify-between">
-				<div className="flex items-center space-x-4">
+			<div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+				<div className="flex items-start gap-3">
 					<Link
 						href="/projects"
-						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+						aria-label="Back to projects"
+						className="rounded-lg p-2 transition-colors hover:bg-platinum-500 dark:hover:bg-paynes_gray-400"
 					>
 						<ArrowLeft size={20} />
 					</Link>
 					<div>
 						<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
-							Project #{params.id}
+							{project.name}
 						</h1>
-						<p className="text-paynes_gray-500 dark:text-french_gray-500 mt-1">
-							Kanban board view for project management
+						<p className="mt-1 text-paynes_gray-500 dark:text-french_gray-500">
+							{project.description || "No project description"}
 						</p>
 					</div>
 				</div>
 
-				<div className="flex items-center space-x-2">
-					<button
-						type="button"
-						aria-label="Project members"
-						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+				<ProjectActions
+					project={{
+						id: project.id,
+						name: project.name,
+						description: project.description,
+						status: project.status,
+						dueDate: project.dueDate?.toISOString() ?? null,
+					}}
+					canManage={canManage}
+					canDelete={canDelete}
+				/>
+			</div>
+
+			<form
+				action={`/projects/${project.id}`}
+				className="grid gap-3 rounded-xl border border-french_gray-300 bg-white p-4 md:grid-cols-[minmax(14rem,1fr)_10rem_13rem_auto] dark:border-paynes_gray-400 dark:bg-outer_space-500"
+			>
+				<DebouncedSearchInput
+					initialValue={filters.q}
+					placeholder="Search task title or description"
+					maxLength={200}
+					accessibleLabel="Search tasks"
+				/>
+
+				<label>
+					<span className="sr-only">Filter by task priority</span>
+					<select
+						name="priority"
+						defaultValue={filters.priority ?? ""}
+						className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
 					>
-						<Users size={20} />
-					</button>
-					<button
-						type="button"
-						aria-label="Project calendar"
-						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+						<option value="">All priorities</option>
+						<option value="low">Low</option>
+						<option value="medium">Medium</option>
+						<option value="high">High</option>
+					</select>
+				</label>
+
+				<label>
+					<span className="sr-only">Filter by task assignee</span>
+					<select
+						name="assignee"
+						defaultValue={filters.assignee ?? ""}
+						className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
 					>
-						<Calendar size={20} />
-					</button>
+						<option value="">All assignees</option>
+						<option value="unassigned">Unassigned</option>
+						{members.map((member) => (
+							<option key={member.id} value={member.id}>
+								{member.name}
+							</option>
+						))}
+					</select>
+				</label>
+
+				<div className="flex gap-2">
 					<button
-						type="button"
-						aria-label="Project settings"
-						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+						type="submit"
+						className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue_munsell-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue_munsell-600"
 					>
-						<Settings size={20} />
+						<SlidersHorizontal size={16} />
+						Apply
 					</button>
-					<button
-						type="button"
-						aria-label="More project actions"
-						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
-					>
-						<MoreHorizontal size={20} />
-					</button>
+					{hasDropdownFilters && (
+						<Link
+							href={`/projects/${project.id}`}
+							className="inline-flex items-center justify-center gap-2 rounded-lg border border-french_gray-300 px-3 text-sm text-paynes_gray-500 hover:bg-platinum-500 dark:border-paynes_gray-400 dark:text-french_gray-400 dark:hover:bg-paynes_gray-400"
+						>
+							<RotateCcw size={16} />
+							Reset filters
+						</Link>
+					)}
 				</div>
-			</div>
+			</form>
 
-			{/* Implementation Tasks Banner */}
-			<div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-				<h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-					🎯 Kanban Board Implementation Tasks
-				</h3>
-				<ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-					<li>• Task 5.1: Design responsive Kanban board layout</li>
-					<li>
-						• Task 5.2: Implement drag-and-drop functionality with dnd-kit
-					</li>
-					<li>
-						• Task 5.4: Implement optimistic UI updates for smooth interactions
-					</li>
-					<li>• Task 5.6: Create task detail modals and editing interfaces</li>
-				</ul>
-			</div>
+			{hasFilters && (
+				<p className="text-sm text-paynes_gray-500 dark:text-french_gray-400">
+					Showing {matchingTaskCount} matching{" "}
+					{matchingTaskCount === 1 ? "task" : "tasks"}
+				</p>
+			)}
 
-			{/* Kanban Board Placeholder */}
-			<div className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6">
-				<div className="flex space-x-6 overflow-x-auto pb-4">
-					{["To Do", "In Progress", "Review", "Done"].map((columnTitle) => (
-						<div key={columnTitle} className="shrink-0 w-80">
-							<div className="bg-platinum-800 dark:bg-outer_space-400 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400">
-								<div className="p-4 border-b border-french_gray-300 dark:border-paynes_gray-400">
-									<div className="flex items-center justify-between">
-										<h3 className="font-semibold text-outer_space-500 dark:text-platinum-500">
-											{columnTitle}
-											<span className="ml-2 px-2 py-1 text-xs bg-french_gray-300 dark:bg-paynes_gray-400 rounded-full">
-												{Math.floor(Math.random() * 5) + 1}
-											</span>
-										</h3>
-										<button
-											type="button"
-											aria-label={`More actions for ${columnTitle}`}
-											className="p-1 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded"
-										>
-											<MoreHorizontal size={16} />
-										</button>
-									</div>
-								</div>
-
-								<div className="p-4 space-y-3 min-h-100">
-									{[1, 2, 3].map((taskIndex) => (
-										<div
-											key={taskIndex}
-											className="p-4 bg-white dark:bg-outer_space-300 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 cursor-pointer hover:shadow-md transition-shadow"
-										>
-											<h4 className="font-medium text-outer_space-500 dark:text-platinum-500 text-sm mb-2">
-												Sample Task {taskIndex}
-											</h4>
-											<p className="text-xs text-paynes_gray-500 dark:text-french_gray-400 mb-3">
-												This is a placeholder task description
-											</p>
-											<div className="flex items-center justify-between">
-												<span className="px-2 py-1 text-xs font-medium rounded-full bg-blue_munsell-100 text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300">
-													Medium
-												</span>
-												<div className="w-6 h-6 bg-blue_munsell-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-													U
-												</div>
-											</div>
-										</div>
-									))}
-
-									<button
-										type="button"
-										className="w-full p-3 border-2 border-dashed border-french_gray-300 dark:border-paynes_gray-400 rounded-lg text-paynes_gray-500 dark:text-french_gray-400 hover:border-blue_munsell-500 hover:text-blue_munsell-500 transition-colors"
-									>
-										+ Add task
-									</button>
-								</div>
-							</div>
-						</div>
-					))}
-				</div>
-			</div>
-
-			{/* Component Implementation Guide */}
-			<div className="mt-8 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-				<h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
-					🛠️ Components & Features to Implement
-				</h3>
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-600 dark:text-gray-400">
-					<div>
-						<strong className="block mb-2">Core Components:</strong>
-						<ul className="space-y-1 list-disc list-inside">
-							<li>components/kanban-board.tsx</li>
-							<li>components/task-card.tsx</li>
-							<li>components/modals/create-task-modal.tsx</li>
-							<li>stores/board-store.ts (Zustand)</li>
-						</ul>
-					</div>
-					<div>
-						<strong className="block mb-2">Advanced Features:</strong>
-						<ul className="space-y-1 list-disc list-inside">
-							<li>Drag & drop with @dnd-kit/core</li>
-							<li>Real-time updates</li>
-							<li>Task assignments & due dates</li>
-							<li>Comments & activity history</li>
-						</ul>
-					</div>
-				</div>
-			</div>
+			<KanbanBoard
+				projectId={project.id}
+				lists={project.lists}
+				members={members}
+				canManage={canManage}
+			/>
 		</div>
 	);
 }

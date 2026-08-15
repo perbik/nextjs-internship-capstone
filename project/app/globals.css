@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "@clerk/themes/shadcn.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
 	--color-platinum-50: #f8f8f8;
 	--color-platinum-100: #f1f1f1;

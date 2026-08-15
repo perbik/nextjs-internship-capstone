@@ -1,48 +1,150 @@
-// TODO: Task 4.1 - Implement project CRUD operations
-// TODO: Task 4.4 - Build task creation and editing functionality
+"use client";
 
-/*
-TODO: Implementation Notes for Interns:
+import { Plus, X } from "lucide-react";
+import { useActionState, useState } from "react";
+import {
+	createProjectAction,
+	type ProjectActionState,
+} from "@/app/(dashboard)/projects/actions";
 
-Modal for creating new projects with form validation.
-
-Features to implement:
-- Form with project name, description, due date
-- Zod validation
-- Error handling
-- Loading states
-- Success feedback
-- Team member assignment
-- Project template selection
-
-Form fields:
-- Name (required)
-- Description (optional)
-- Due date (optional)
-- Team members (optional)
-- Project template (optional)
-- Privacy settings
-
-Integration:
-- Use project validation schema from lib/validations.ts
-- Call project creation API
-- Update project list optimistically
-- Handle errors gracefully
-*/
+const initialState: ProjectActionState = { message: "" };
 
 export function CreateProjectModal() {
+	const [isOpen, setIsOpen] = useState(false);
+	const [state, formAction, isPending] = useActionState(
+		createProjectAction,
+		initialState,
+	);
+
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-			<div className="bg-white dark:bg-outer_space-500 rounded-lg p-6 w-full max-w-md mx-4">
-				<h3 className="text-lg font-semibold text-outer_space-500 dark:text-platinum-500 mb-4">
-					TODO: Create Project Modal
-				</h3>
-				<div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded border border-yellow-200 dark:border-yellow-800">
-					<p className="text-sm text-yellow-800 dark:text-yellow-200">
-						📋 Implement project creation form with validation
-					</p>
+		<>
+			<button
+				type="button"
+				onClick={() => setIsOpen(true)}
+				className="inline-flex items-center rounded-lg bg-blue_munsell-500 px-4 py-2 text-white transition-colors hover:bg-blue_munsell-600"
+			>
+				<Plus size={20} className="mr-2" />
+				New Project
+			</button>
+
+			{isOpen && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+					<div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-outer_space-500">
+						<div className="mb-5 flex items-center justify-between">
+							<h2 className="text-xl font-semibold text-outer_space-500 dark:text-platinum-500">
+								Create project
+							</h2>
+							<button
+								type="button"
+								aria-label="Close create project dialog"
+								onClick={() => setIsOpen(false)}
+								className="rounded-md p-1 text-paynes_gray-500 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400"
+							>
+								<X size={20} />
+							</button>
+						</div>
+
+						<form action={formAction} className="space-y-4">
+							<ProjectField
+								label="Name"
+								name="name"
+								required
+								error={state.errors?.name?.[0]}
+							/>
+
+							<div>
+								<label
+									htmlFor="create-project-description"
+									className="mb-1 block text-sm font-medium text-outer_space-500 dark:text-platinum-500"
+								>
+									Description
+								</label>
+								<textarea
+									id="create-project-description"
+									name="description"
+									rows={4}
+									className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
+								/>
+								<FieldError message={state.errors?.description?.[0]} />
+							</div>
+
+							<ProjectField
+								label="Due date"
+								name="dueDate"
+								type="date"
+								error={state.errors?.dueDate?.[0]}
+							/>
+
+							{state.message && (
+								<p
+									className="text-sm text-red-600 dark:text-red-400"
+									role="alert"
+								>
+									{state.message}
+								</p>
+							)}
+
+							<div className="flex justify-end gap-3 pt-2">
+								<button
+									type="button"
+									onClick={() => setIsOpen(false)}
+									className="rounded-lg px-4 py-2 text-paynes_gray-500 hover:bg-platinum-500 dark:text-french_gray-400 dark:hover:bg-paynes_gray-400"
+								>
+									Cancel
+								</button>
+								<button
+									type="submit"
+									disabled={isPending}
+									className="rounded-lg bg-blue_munsell-500 px-4 py-2 text-white hover:bg-blue_munsell-600 disabled:cursor-not-allowed disabled:opacity-60"
+								>
+									{isPending ? "Creating..." : "Create project"}
+								</button>
+							</div>
+						</form>
+					</div>
 				</div>
-			</div>
+			)}
+		</>
+	);
+}
+
+function ProjectField({
+	label,
+	name,
+	type = "text",
+	required = false,
+	error,
+}: {
+	label: string;
+	name: string;
+	type?: string;
+	required?: boolean;
+	error?: string;
+}) {
+	const id = `create-project-${name}`;
+
+	return (
+		<div>
+			<label
+				htmlFor={id}
+				className="mb-1 block text-sm font-medium text-outer_space-500 dark:text-platinum-500"
+			>
+				{label}
+			</label>
+			<input
+				id={id}
+				name={name}
+				type={type}
+				required={required}
+				className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
+			/>
+			<FieldError message={error} />
 		</div>
 	);
+}
+
+function FieldError({ message }: { message?: string }) {
+	return message ? (
+		<p className="mt-1 text-sm text-red-600 dark:text-red-400">{message}</p>
+	) : null;
 }

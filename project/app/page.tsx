@@ -137,7 +137,7 @@ export default function HomePage() {
 						</Link>
 
 						<Link
-							href="/projects/1"
+							href="/projects"
 							className="p-4 bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 hover:shadow-lg transition-shadow"
 						>
 							<h3 className="font-semibold text-outer_space-500 dark:text-platinum-500 mb-2">

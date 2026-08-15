@@ -1,14 +1,14 @@
 "use client";
 
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
-import { ArrowRight, Menu, Moon, Sun, X } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { useTheme } from "@/components/theme/theme-provider";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { Button } from "@/components/ui/button";
 
 export function PublicHeader() {
 	const [open, setOpen] = useState(false);
-	const { theme, setTheme } = useTheme();
 
 	return (
 		<>
@@ -21,32 +21,28 @@ export function PublicHeader() {
 						Brix
 					</Link>
 					<div className="hidden items-center gap-2 sm:flex">
-						<ThemeButton
-							theme={theme}
-							onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-						/>
+						<ThemeToggle />
 						<Show when="signed-out">
 							<SignInButton mode="redirect">
-								<button
+								<Button
 									type="button"
-									className="h-9 rounded-full border border-border px-4 text-sm font-medium hover:border-brand/40 hover:bg-brand/5 "
+									variant="outline"
+									size="sm"
+									className="rounded-full px-5"
 								>
 									Sign In
-								</button>
+								</Button>
 							</SignInButton>
 							<SignUpButton mode="redirect">
-								<button
-									type="button"
-									className="h-9 rounded-full bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-dark"
-								>
+								<Button type="button" size="sm" className="rounded-full px-6">
 									Get Started
-								</button>
+								</Button>
 							</SignUpButton>
 						</Show>
 						<Show when="signed-in">
 							<Link
 								href="/dashboard"
-								className="flex h-11 items-center gap-3 rounded-lg bg-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark"
+								className="flex h-9 items-center gap-3 rounded-md bg-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark"
 							>
 								Dashboard
 								<ArrowRight size={17} />
@@ -55,10 +51,7 @@ export function PublicHeader() {
 						</Show>
 					</div>
 					<div className="flex items-center gap-2 sm:hidden">
-						<ThemeButton
-							theme={theme}
-							onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-						/>
+						<ThemeToggle />
 						<button
 							type="button"
 							aria-label="Toggle navigation"
@@ -74,20 +67,18 @@ export function PublicHeader() {
 				<div className="fixed inset-x-0 top-14 z-40 flex flex-col gap-2 border-b border-border bg-card p-4 shadow-lg  dark:bg-background sm:hidden">
 					<Show when="signed-out">
 						<SignInButton mode="redirect">
-							<button
+							<Button
 								type="button"
-								className="h-11 rounded-full border border-border text-sm font-medium "
+								variant="outline"
+								className="h-11 rounded-full"
 							>
 								Sign In
-							</button>
+							</Button>
 						</SignInButton>
 						<SignUpButton mode="redirect">
-							<button
-								type="button"
-								className="h-11 rounded-full bg-brand text-sm font-semibold text-white"
-							>
+							<Button type="button" className="h-11 rounded-full">
 								Get Started
-							</button>
+							</Button>
 						</SignUpButton>
 					</Show>
 					<Show when="signed-in">
@@ -101,24 +92,5 @@ export function PublicHeader() {
 				</div>
 			)}
 		</>
-	);
-}
-
-function ThemeButton({
-	theme,
-	onClick,
-}: {
-	theme: string;
-	onClick: () => void;
-}) {
-	return (
-		<button
-			type="button"
-			aria-label="Toggle theme"
-			onClick={onClick}
-			className="flex size-11 items-center justify-center rounded-lg border border-brand bg-brand text-white transition-colors hover:bg-brand-dark dark:text-white"
-		>
-			{theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-		</button>
 	);
 }

@@ -16,5 +16,5 @@ export interface ProjectTaskCounts {
 
 export interface ProjectDatePresentation {
 	label: string;
-	className: string;
+	badgeClassName: string;
 }

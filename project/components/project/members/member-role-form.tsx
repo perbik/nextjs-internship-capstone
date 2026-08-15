@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
 	type MemberActionState,
 	updateProjectMemberRoleAction,
@@ -14,7 +15,11 @@ import type {
 	OptimisticRoleChange,
 } from "./types";
 
-const initialState: MemberActionState = { message: "" };
+const INITIAL_MEMBER_STATE: MemberActionState = { message: "" };
+const MEMBER_ROLE_OPTIONS = [
+	{ value: "member", label: "Member" },
+	{ value: "admin", label: "Admin" },
+] satisfies Array<{ value: MutableProjectMemberRole; label: string }>;
 
 interface MemberRoleFormProps {
 	projectId: string;
@@ -43,6 +48,7 @@ export function MemberRoleForm({
 		async (previous: MemberActionState, formData: FormData) => {
 			const role = formData.get("role");
 
+			// Show the new role immediately, then commit it after the server succeeds
 			if (isMutableRole(role)) {
 				onOptimisticRoleChange({ userId: member.id, role });
 			}
@@ -51,12 +57,15 @@ export function MemberRoleForm({
 
 			if (result.success && isMutableRole(role)) {
 				onRoleChangeCommitted({ userId: member.id, role });
+				toast.success(result.message);
 				router.refresh();
+			} else if (!result.success) {
+				setSelectedRole(member.role === "admin" ? "admin" : "member");
 			}
 
 			return result;
 		},
-		initialState,
+		INITIAL_MEMBER_STATE,
 	);
 
 	useEffect(() => {
@@ -72,28 +81,19 @@ export function MemberRoleForm({
 			<FormSelect
 				name="role"
 				value={selectedRole}
-				onValueChange={(role) =>
-					setSelectedRole(role as MutableProjectMemberRole)
-				}
+				onValueChange={(role) => {
+					if (isMutableRole(role)) setSelectedRole(role);
+				}}
 				disabled={isPending}
 				ariaLabel={`Role for ${member.name}`}
-				options={[
-					{ value: "member", label: "Member" },
-					{ value: "admin", label: "Admin" },
-				]}
+				options={MEMBER_ROLE_OPTIONS}
 				triggerClassName="h-8 min-w-28 px-2 text-xs"
 			/>
 			<Button type="submit" variant="outline" size="sm" disabled={isPending}>
 				{isPending ? "Saving..." : "Save"}
 			</Button>
-			{state.message && (
-				<span
-					className={
-						state.success
-							? "text-xs text-green-700 dark:text-green-400"
-							: "text-xs text-red-600 dark:text-red-400"
-					}
-				>
+			{state.message && !state.success && (
+				<span className="text-xs text-destructive" role="alert">
 					{state.message}
 				</span>
 			)}

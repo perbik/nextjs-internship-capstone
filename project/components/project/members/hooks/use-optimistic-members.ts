@@ -14,11 +14,13 @@ function updateMemberRole(
 
 export function useOptimisticMembers(members: ManagedProjectMember[]) {
 	const [confirmedMembers, setConfirmedMembers] = useState(members);
+	// Apply a temporary role while the server update is pending
 	const [optimisticMembers, applyOptimisticRoleChange] = useOptimistic(
 		confirmedMembers,
 		updateMemberRole,
 	);
 
+	// Synchronize local state with the latest server data
 	useEffect(() => {
 		setConfirmedMembers(members);
 	}, [members]);

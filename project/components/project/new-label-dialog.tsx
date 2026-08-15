@@ -3,7 +3,7 @@
 import { ChevronDown, Plus, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useId, useState } from "react";
 import {
 	createLabelAction,
 	type LabelActionState,
@@ -17,6 +17,7 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -25,10 +26,10 @@ interface NewLabelDialogProps {
 	trigger?: ReactNode;
 }
 
-const initialState: LabelActionState = { message: "" };
-const initialColor = "#c650bc";
-const labelColors = [
-	initialColor,
+const INITIAL_LABEL_STATE: LabelActionState = { message: "" };
+const DEFAULT_LABEL_COLOR = "#c650bc";
+const LABEL_COLORS = [
+	DEFAULT_LABEL_COLOR,
 	"#2389a8",
 	"#22c55e",
 	"#eab308",
@@ -76,7 +77,7 @@ export function InlineNewLabelForm({ projectId }: { projectId: string }) {
 				type="button"
 				onClick={() => setExpanded((current) => !current)}
 				aria-expanded={expanded}
-				className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-foreground hover:text-brand "
+				className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm font-semibold text-foreground hover:text-brand"
 			>
 				<span className="flex items-center gap-2">
 					<span className="flex size-7 items-center justify-center rounded-full bg-brand/10 text-brand">
@@ -90,7 +91,7 @@ export function InlineNewLabelForm({ projectId }: { projectId: string }) {
 				/>
 			</button>
 			{expanded && (
-				<div className="border-t border-border p-4 ">
+				<div className="border-t border-border p-3">
 					<NewLabelForm
 						projectId={projectId}
 						onCancel={() => setExpanded(false)}
@@ -115,28 +116,33 @@ function NewLabelForm({
 	compact?: boolean;
 }) {
 	const router = useRouter();
+	const formId = useId();
 	const [name, setName] = useState("");
-	const [color, setColor] = useState(initialColor);
+	const [color, setColor] = useState(DEFAULT_LABEL_COLOR);
 	const [state, action, isPending] = useActionState(
 		createLabelAction,
-		initialState,
+		INITIAL_LABEL_STATE,
 	);
-	const previewColor = /^#[0-9a-fA-F]{6}$/.test(color) ? color : initialColor;
+	// Use a safe fallback until the entered hex color is valid
+	const previewColor = /^#[0-9a-fA-F]{6}$/.test(color)
+		? color
+		: DEFAULT_LABEL_COLOR;
 
+	// Reset the form and close its container after successful creation
 	useEffect(() => {
 		if (!state.success) return;
 
 		setName("");
-		setColor(initialColor);
+		setColor(DEFAULT_LABEL_COLOR);
 		onCreated();
 		router.refresh();
 	}, [onCreated, router, state.success]);
 
 	function chooseNextColor() {
-		const currentIndex = labelColors.findIndex(
+		const currentIndex = LABEL_COLORS.findIndex(
 			(labelColor) => labelColor.toLowerCase() === color.toLowerCase(),
 		);
-		setColor(labelColors[(currentIndex + 1) % labelColors.length]);
+		setColor(LABEL_COLORS[(currentIndex + 1) % LABEL_COLORS.length]);
 	}
 
 	return (
@@ -156,20 +162,21 @@ function NewLabelForm({
 
 			<div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_11rem]">
 				<div className="space-y-2">
-					<Label htmlFor={`${projectId}-label-name`}>Name</Label>
+					<Label htmlFor={`${formId}-label-name`}>Name</Label>
 					<Input
-						id={`${projectId}-label-name`}
+						id={`${formId}-label-name`}
 						name="name"
 						value={name}
 						onChange={(event) => setName(event.target.value)}
 						placeholder="Label name"
 						maxLength={50}
+						autoComplete="off"
 						required
 					/>
 				</div>
 
 				<div className="space-y-2">
-					<Label htmlFor={`${projectId}-label-color`}>Color</Label>
+					<Label htmlFor={`${formId}-label-color`}>Color</Label>
 					<div className="flex items-center gap-2">
 						<Button
 							type="button"
@@ -182,13 +189,14 @@ function NewLabelForm({
 							<RefreshCw />
 						</Button>
 						<Input
-							id={`${projectId}-label-color`}
+							id={`${formId}-label-color`}
 							name="color"
 							value={color}
 							onChange={(event) => setColor(event.target.value)}
 							placeholder="#c650bc"
 							pattern="#[0-9a-fA-F]{6}"
 							maxLength={7}
+							autoComplete="off"
 							required
 							className="font-mono"
 						/>
@@ -196,11 +204,7 @@ function NewLabelForm({
 				</div>
 			</div>
 
-			{state.message && !state.success && (
-				<p className="text-sm text-red-600 dark:text-red-400" role="alert">
-					{state.message}
-				</p>
-			)}
+			<FieldError message={state.success ? undefined : state.message} />
 
 			<div className="flex justify-end gap-2">
 				<Button type="button" variant="outline" onClick={onCancel}>

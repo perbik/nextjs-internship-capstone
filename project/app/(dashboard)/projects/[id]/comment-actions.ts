@@ -8,7 +8,7 @@ import {
 	updateComment,
 } from "@/lib/db/mutations";
 import { getTaskDiscussion } from "@/lib/db/queries";
-import { commentCreateSchema, commentUpdateSchema } from "@/lib/validations";
+import { commentCreateSchema, commentSchema } from "@/lib/validations";
 
 export interface CommentActionState {
 	message: string;
@@ -16,6 +16,17 @@ export interface CommentActionState {
 	errors?: Record<string, string[]>;
 }
 
+const COMMENT_ID_SCHEMA = z.uuid("Comment must be a valid ID");
+const TASK_ID_SCHEMA = z.uuid("Task must be a valid ID");
+const COMMENT_ACTION_MESSAGES = new Set([
+	"You must be signed in",
+	"Your ProjectFlow account is not synchronized yet",
+	"You do not have access to this task",
+	"You can only edit your own comments",
+	"You can only delete your own comments",
+]);
+
+// Shared helpers for comment actions
 function stringValue(formData: FormData, key: string) {
 	const value = formData.get(key);
 	return typeof value === "string" ? value : undefined;
@@ -32,90 +43,94 @@ function validationError(error: z.ZodError): CommentActionState {
 	};
 }
 
+function actionError(error: unknown, fallback: string): CommentActionState {
+	if (error instanceof Error && COMMENT_ACTION_MESSAGES.has(error.message)) {
+		return { message: error.message };
+	}
+
+	console.error(fallback, error);
+	return { message: fallback };
+}
+
+// Add a comment to an accessible task
 export async function createCommentAction(
 	_previousState: CommentActionState,
 	formData: FormData,
 ): Promise<CommentActionState> {
-	const projectId = z.uuid().safeParse(stringValue(formData, "projectId"));
-	const parsed = commentCreateSchema.safeParse({
-		taskId: stringValue(formData, "taskId"),
-		content: stringValue(formData, "content"),
-	});
-
-	if (!projectId.success || !parsed.success) {
-		return parsed.success
-			? { message: "Invalid project ID" }
-			: validationError(parsed.error);
-	}
-
 	try {
 		const user = await requireCurrentUser();
+		const parsed = commentCreateSchema.safeParse({
+			taskId: stringValue(formData, "taskId"),
+			content: stringValue(formData, "content"),
+		});
+
+		if (!parsed.success) {
+			return validationError(parsed.error);
+		}
+
 		await createComment(parsed.data.taskId, user.id, parsed.data.content);
 	} catch (error) {
-		return {
-			message:
-				error instanceof Error ? error.message : "Unable to add the comment",
-		};
+		return actionError(error, "Unable to add the comment");
 	}
 
 	return { message: "Comment added", success: true };
 }
 
+// Update a comment written by the current user
 export async function updateCommentAction(
 	_previousState: CommentActionState,
 	formData: FormData,
 ): Promise<CommentActionState> {
-	const projectId = z.uuid().safeParse(stringValue(formData, "projectId"));
-	const commentId = z.uuid().safeParse(stringValue(formData, "commentId"));
-	const parsed = commentUpdateSchema.safeParse({
-		content: stringValue(formData, "content"),
-	});
-
-	if (!projectId.success || !commentId.success || !parsed.success) {
-		return parsed.success
-			? { message: "Invalid project or comment ID" }
-			: validationError(parsed.error);
-	}
-
 	try {
 		const user = await requireCurrentUser();
-		await updateComment(commentId.data, user.id, parsed.data.content ?? "");
+		const commentId = COMMENT_ID_SCHEMA.safeParse(
+			stringValue(formData, "commentId"),
+		);
+		const parsed = commentSchema.safeParse({
+			content: stringValue(formData, "content"),
+		});
+
+		if (!commentId.success || !parsed.success) {
+			return parsed.success
+				? { message: "Invalid comment ID" }
+				: validationError(parsed.error);
+		}
+
+		await updateComment(commentId.data, user.id, parsed.data.content);
 	} catch (error) {
-		return {
-			message:
-				error instanceof Error ? error.message : "Unable to edit the comment",
-		};
+		return actionError(error, "Unable to edit the comment");
 	}
 
 	return { message: "Comment updated", success: true };
 }
 
+// Delete a comment written by the current user
 export async function deleteCommentAction(
 	_previousState: CommentActionState,
 	formData: FormData,
 ): Promise<CommentActionState> {
-	const projectId = z.uuid().safeParse(stringValue(formData, "projectId"));
-	const commentId = z.uuid().safeParse(stringValue(formData, "commentId"));
-
-	if (!projectId.success || !commentId.success) {
-		return { message: "Invalid project or comment ID" };
-	}
-
 	try {
 		const user = await requireCurrentUser();
+		const commentId = COMMENT_ID_SCHEMA.safeParse(
+			stringValue(formData, "commentId"),
+		);
+
+		if (!commentId.success) {
+			return {
+				message: commentId.error.issues[0]?.message ?? "Invalid comment ID",
+			};
+		}
+
 		await deleteComment(commentId.data, user.id);
 	} catch (error) {
-		return {
-			message:
-				error instanceof Error ? error.message : "Unable to delete the comment",
-		};
+		return actionError(error, "Unable to delete the comment");
 	}
 
 	return { message: "Comment deleted", success: true };
 }
 
 export async function getTaskDiscussionAction(taskId: string) {
-	const parsedTaskId = z.uuid().safeParse(taskId);
+	const parsedTaskId = TASK_ID_SCHEMA.safeParse(taskId);
 
 	if (!parsedTaskId.success) {
 		return { message: "Invalid task ID", discussion: null };

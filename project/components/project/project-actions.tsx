@@ -1,7 +1,13 @@
 "use client";
 
 import { Pencil, Trash2 } from "lucide-react";
-import { useActionState, useEffect, useId, useState } from "react";
+import {
+	type HTMLInputTypeAttribute,
+	useActionState,
+	useEffect,
+	useId,
+	useState,
+} from "react";
 import {
 	deleteProjectAction,
 	type ProjectActionState,
@@ -12,6 +18,7 @@ import {
 	type TaskLabelOption,
 } from "@/components/project/project-labels";
 import { Button } from "@/components/ui/button";
+import { DatePickerField } from "@/components/ui/date-picker-field";
 import { DestructiveActionDialog } from "@/components/ui/destructive-action-dialog";
 import {
 	Dialog,
@@ -21,11 +28,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { FieldError } from "@/components/ui/field-error";
 import { FormSelect } from "@/components/ui/form-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import type { ProjectStatus } from "@/types";
+import { TextareaWithCounter } from "@/components/ui/textarea-with-counter";
+import type { ProjectStatus } from "@/lib/db/schema";
 
 interface ProjectActionsProps {
 	project: {
@@ -37,31 +45,38 @@ interface ProjectActionsProps {
 	};
 	canManage: boolean;
 	canDelete: boolean;
-	variant?: "default" | "compact" | "manage";
+	variant: "compact" | "manage";
 	labels?: TaskLabelOption[];
 }
 
 const initialState: ProjectActionState = { message: "" };
+const PROJECT_STATUS_OPTIONS = [
+	{ value: "active", label: "Active" },
+	{ value: "completed", label: "Completed" },
+	{ value: "on_hold", label: "On hold" },
+] satisfies Array<{ value: ProjectStatus; label: string }>;
 
 export function ProjectActions({
 	project,
 	canManage,
 	canDelete,
-	variant = "default",
+	variant,
 	labels,
 }: ProjectActionsProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const formId = useId();
+	const projectFormId = `${formId}-project-form`;
 	const [state, formAction, isPending] = useActionState(
 		updateProjectAction,
 		initialState,
 	);
 
+	// Close the dialog after a successful project update
 	useEffect(() => {
 		if (state.success) {
 			setIsOpen(false);
 		}
-	}, [state]);
+	}, [state.success]);
 
 	if (!canManage && !canDelete) {
 		return null;
@@ -71,34 +86,23 @@ export function ProjectActions({
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
 			<div className="flex items-center gap-2">
 				{canManage && (
-					<button
+					<Button
 						type="button"
+						variant={variant === "manage" ? "default" : "outline"}
+						size={variant === "compact" ? "icon" : "lg"}
 						onClick={() => setIsOpen(true)}
 						aria-label={`Edit ${project.name}`}
 						className={
-							variant === "compact"
-								? "rounded-md border border-french_gray-300 p-2 text-paynes_gray-500 transition-colors hover:border-blue_munsell-500 hover:text-blue_munsell-500 dark:border-paynes_gray-400 dark:text-french_gray-400"
-								: variant === "manage"
-									? "inline-flex h-12 items-center gap-2 rounded-full bg-brand px-5 text-sm font-semibold text-white transition hover:bg-brand/90"
-									: "inline-flex items-center rounded-lg border border-french_gray-300 px-3 py-2 text-sm text-outer_space-500 hover:bg-platinum-500 dark:border-paynes_gray-400 dark:text-platinum-500 dark:hover:bg-paynes_gray-400"
+							variant === "compact" ? "size-9" : "h-9 rounded-full px-5"
 						}
 					>
-						<Pencil size={16} className={variant === "default" ? "mr-2" : ""} />
-						{variant === "default" && "Edit"}
+						<Pencil aria-hidden="true" />
 						{variant === "manage" && "Manage Project"}
-					</button>
-				)}
-
-				{canDelete && variant === "default" && (
-					<DeleteProjectDialog
-						projectId={project.id}
-						projectName={project.name}
-						compact
-					/>
+					</Button>
 				)}
 			</div>
 
-			<DialogContent className="sm:max-w-2xl">
+			<DialogContent className="gap-3 p-4 sm:max-w-2xl sm:p-5">
 				<DialogHeader>
 					<DialogTitle>Manage Project</DialogTitle>
 					<DialogDescription>
@@ -106,7 +110,7 @@ export function ProjectActions({
 					</DialogDescription>
 				</DialogHeader>
 
-				<form action={formAction} className="space-y-4">
+				<form id={projectFormId} action={formAction} className="space-y-3">
 					<input type="hidden" name="projectId" value={project.id} />
 					<EditField
 						idPrefix={formId}
@@ -117,63 +121,49 @@ export function ProjectActions({
 						error={state.errors?.name?.[0]}
 					/>
 
-					<div className="space-y-2">
+					<div className="space-y-1.5">
 						<Label htmlFor={`${formId}-edit-description`}>Description</Label>
-						<Textarea
+						<TextareaWithCounter
 							id={`${formId}-edit-description`}
 							name="description"
 							defaultValue={project.description ?? ""}
-							rows={4}
+							rows={3}
+							maxLength={500}
 						/>
-						<EditError message={state.errors?.description?.[0]} />
+						<FieldError message={state.errors?.description?.[0]} />
 					</div>
 
-					<div className="space-y-2">
-						<Label htmlFor={`${formId}-edit-status`}>Status</Label>
-						<FormSelect
-							id={`${formId}-edit-status`}
-							name="status"
-							defaultValue={project.status}
-							options={[
-								{ value: "active", label: "Active" },
-								{ value: "completed", label: "Completed" },
-								{ value: "on_hold", label: "On hold" },
-							]}
+					<div className="grid gap-3 sm:grid-cols-2">
+						<div className="space-y-1.5">
+							<Label htmlFor={`${formId}-edit-status`}>Status</Label>
+							<FormSelect
+								id={`${formId}-edit-status`}
+								name="status"
+								defaultValue={project.status}
+								options={PROJECT_STATUS_OPTIONS}
+							/>
+							<FieldError message={state.errors?.status?.[0]} />
+						</div>
+						<EditField
+							idPrefix={formId}
+							label="Due date"
+							name="dueDate"
+							type="date"
+							defaultValue={project.dueDate?.slice(0, 10) ?? ""}
+							error={state.errors?.dueDate?.[0]}
 						/>
-						<EditError message={state.errors?.status?.[0]} />
 					</div>
-
-					<EditField
-						idPrefix={formId}
-						label="Due date"
-						name="dueDate"
-						type="date"
-						defaultValue={project.dueDate?.slice(0, 10) ?? ""}
-						error={state.errors?.dueDate?.[0]}
-					/>
 
 					{state.message && !state.success && (
-						<p className="text-sm text-red-600 dark:text-red-400" role="alert">
+						<p className="text-sm text-destructive" role="alert">
 							{state.message}
 						</p>
 					)}
-
-					<DialogFooter className="pt-2">
-						<Button
-							type="button"
-							variant="outline"
-							onClick={() => setIsOpen(false)}
-						>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={isPending}>
-							{isPending ? "Saving..." : "Save changes"}
-						</Button>
-					</DialogFooter>
 				</form>
 
+				{/* Label creation uses its own form, so it stays outside the project form */}
 				{variant === "manage" && labels && (
-					<div className="mt-5">
+					<div>
 						<ProjectLabels
 							projectId={project.id}
 							labels={labels}
@@ -182,8 +172,22 @@ export function ProjectActions({
 					</div>
 				)}
 
-				{canDelete && variant !== "default" && (
-					<div className="mt-5 border-t border-border pt-4 ">
+				<DialogFooter>
+					<Button
+						type="button"
+						variant="outline"
+						onClick={() => setIsOpen(false)}
+					>
+						Cancel
+					</Button>
+					<Button type="submit" form={projectFormId} disabled={isPending}>
+						{isPending ? "Saving..." : "Save changes"}
+					</Button>
+				</DialogFooter>
+
+				{/* Project deletion only to authorized owners */}
+				{canDelete && variant === "manage" && (
+					<div className="border-t border-border pt-3">
 						<DeleteProjectDialog
 							projectId={project.id}
 							projectName={project.name}
@@ -198,11 +202,9 @@ export function ProjectActions({
 function DeleteProjectDialog({
 	projectId,
 	projectName,
-	compact = false,
 }: {
 	projectId: string;
 	projectName: string;
-	compact?: boolean;
 }) {
 	const [state, action, isPending] = useActionState(
 		deleteProjectAction,
@@ -218,19 +220,16 @@ function DeleteProjectDialog({
 			confirmLabel="Delete project"
 			error={state.success ? undefined : state.message}
 			trigger={
-				<button
+				<Button
 					type="button"
+					variant="ghost"
 					disabled={isPending}
 					aria-label={`Delete ${projectName}`}
-					className={
-						compact
-							? "inline-flex items-center rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
-							: "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
-					}
+					className="text-destructive hover:bg-destructive/10 hover:text-destructive"
 				>
-					<Trash2 size={16} className={compact ? "mr-2" : undefined} />
-					{compact ? "Delete" : "Delete project"}
-				</button>
+					<Trash2 size={16} />
+					Delete project
+				</Button>
 			}
 		/>
 	);
@@ -248,7 +247,7 @@ function EditField({
 	idPrefix: string;
 	label: string;
 	name: string;
-	type?: string;
+	type?: HTMLInputTypeAttribute;
 	defaultValue: string;
 	required?: boolean;
 	error?: string;
@@ -256,22 +255,25 @@ function EditField({
 	const id = `${idPrefix}-edit-${name}`;
 
 	return (
-		<div className="space-y-2">
+		<div className="space-y-1.5">
 			<Label htmlFor={id}>{label}</Label>
-			<Input
-				id={id}
-				name={name}
-				type={type}
-				defaultValue={defaultValue}
-				required={required}
-			/>
-			<EditError message={error} />
+			{type === "date" ? (
+				<DatePickerField
+					id={id}
+					name={name}
+					defaultValue={defaultValue}
+					required={required}
+				/>
+			) : (
+				<Input
+					id={id}
+					name={name}
+					type={type}
+					defaultValue={defaultValue}
+					required={required}
+				/>
+			)}
+			<FieldError message={error} />
 		</div>
 	);
-}
-
-function EditError({ message }: { message?: string }) {
-	return message ? (
-		<p className="mt-1 text-sm text-red-600">{message}</p>
-	) : null;
 }

@@ -2,7 +2,6 @@
 
 import { Users } from "lucide-react";
 import { useState } from "react";
-import { AssignProjectTeamForm } from "@/components/project/assign-project-team-form";
 import {
 	type EligibleProjectMember,
 	type ManagedProjectMember,
@@ -23,8 +22,6 @@ interface ProjectCollaboratorsDialogProps {
 	members: ManagedProjectMember[];
 	actorRole: "owner" | "admin";
 	eligibleMembers: EligibleProjectMember[];
-	manageableTeams: Array<{ id: string; name: string }>;
-	showTeamAssignment: boolean;
 }
 
 export function ProjectCollaboratorsDialog({
@@ -32,8 +29,6 @@ export function ProjectCollaboratorsDialog({
 	members,
 	actorRole,
 	eligibleMembers,
-	manageableTeams,
-	showTeamAssignment,
 }: ProjectCollaboratorsDialogProps) {
 	const [isOpen, setIsOpen] = useState(false);
 
@@ -50,20 +45,14 @@ export function ProjectCollaboratorsDialog({
 					Manage Collaborators
 				</Button>
 			</DialogTrigger>
-			<DialogContent className="sm:max-w-3xl">
+			<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
 				<DialogHeader>
 					<DialogTitle>Manage Collaborators</DialogTitle>
 					<DialogDescription>
-						Add collaborators, update roles, or remove access.
+						Add eligible team members, update roles, or remove project access.
 					</DialogDescription>
 				</DialogHeader>
 				<div className="space-y-4">
-					{showTeamAssignment && (
-						<AssignProjectTeamForm
-							projectId={projectId}
-							teams={manageableTeams}
-						/>
-					)}
 					<ProjectMembersManager
 						projectId={projectId}
 						members={members}

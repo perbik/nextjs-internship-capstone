@@ -1,5 +1,5 @@
+import type { ProjectStatus } from "@/lib/db/schema";
 import type { BoardList } from "@/stores/board-store";
-import type { ProjectStatus } from "@/types";
 import type { ProjectDatePresentation, ProjectTaskCounts } from "../types";
 
 export function getProjectTaskCounts(
@@ -28,23 +28,24 @@ export function calculateProjectProgress(
 	completedTaskCount: number,
 	taskCount: number,
 ): number {
-	return taskCount === 0
-		? 0
-		: Math.round((completedTaskCount / taskCount) * 100);
+	if (taskCount <= 0) return 0;
+
+	const progress = Math.round((completedTaskCount / taskCount) * 100);
+	return Math.min(100, Math.max(0, progress));
 }
 
-export function isProjectOverdue(
-	dueDate: Date | null,
-	status: ProjectStatus,
-	now = Date.now(),
-): boolean {
-	return Boolean(dueDate && status !== "completed" && dueDate.getTime() < now);
+export function isProjectOverdue(dueDate: Date, now = new Date()): boolean {
+	const today = new Date(now);
+	today.setUTCHours(0, 0, 0, 0);
+
+	return dueDate.getTime() < today.getTime();
 }
 
 export function formatProjectDate(date: Date): string {
 	return date.toLocaleDateString("en-US", {
 		month: "short",
 		day: "numeric",
+		timeZone: "UTC",
 	});
 }
 
@@ -52,33 +53,33 @@ export function getProjectDatePresentation(
 	dueDate: Date | null,
 	status: ProjectStatus,
 ): ProjectDatePresentation {
-	if (!dueDate) {
-		return {
-			label: "No due date",
-			className: "bg-[#2986ff] text-white",
-		};
-	}
-
-	const formattedDate = formatProjectDate(dueDate);
-
 	if (status === "completed") {
 		return {
-			label: `Completed on ${formattedDate}`,
-			className: "bg-[#66c24b] text-white",
+			label: "Completed",
+			badgeClassName: "bg-success text-white dark:text-background",
 		};
 	}
 
 	if (status === "on_hold") {
 		return {
-			label: `Paused on ${formattedDate}`,
-			className: "bg-[#ffbb00] text-[#51421a]",
+			label: "On hold",
+			badgeClassName: "bg-warning text-[#51421a]",
 		};
 	}
 
+	if (!dueDate) {
+		return {
+			label: "No due date",
+			badgeClassName: "bg-info text-white",
+		};
+	}
+
+	const formattedDate = formatProjectDate(dueDate);
+
 	return {
 		label: `Due on ${formattedDate}`,
-		className: isProjectOverdue(dueDate, status)
-			? "bg-red-500 text-white"
-			: "bg-[#2986ff] text-white",
+		badgeClassName: isProjectOverdue(dueDate)
+			? "bg-destructive text-destructive-foreground"
+			: "bg-info text-white",
 	};
 }

@@ -43,8 +43,9 @@ export function ProjectMembersManager({
 				eligibleMembers={eligibleMembers}
 			/>
 
-			<div className="divide-y divide-black/10 dark:divide-white/10">
+			<ul className="divide-y divide-border">
 				{optimisticMembers.map((member) => {
+					// Match the project role permissions enforced by the server
 					const canChangeRole =
 						actorRole === "owner" && member.role !== "owner";
 					const canRemove =
@@ -52,7 +53,7 @@ export function ProjectMembersManager({
 						(actorRole === "owner" || member.role === "member");
 
 					return (
-						<div
+						<li
 							key={member.id}
 							className="flex flex-col justify-between gap-3 py-3 sm:flex-row sm:items-center"
 						>
@@ -62,7 +63,7 @@ export function ProjectMembersManager({
 									{member.isCurrentUser ? " (You)" : ""}
 								</p>
 								<p className="truncate text-xs text-muted-foreground">
-									{member.email} {" · "}
+									{member.email} {" \u00b7 "}
 									<span className="capitalize">{member.role}</span>
 								</p>
 							</div>
@@ -79,10 +80,10 @@ export function ProjectMembersManager({
 									<RemoveMemberForm projectId={projectId} member={member} />
 								)}
 							</div>
-						</div>
+						</li>
 					);
 				})}
-			</div>
+			</ul>
 		</section>
 	);
 }

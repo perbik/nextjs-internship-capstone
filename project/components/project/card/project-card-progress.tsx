@@ -1,7 +1,7 @@
 import type { ProjectCardVariant } from "./types";
 import { calculateProjectProgress } from "./utils/project-card-utils";
 
-const progressSegments = Array.from({ length: 10 }, (_, index) => index + 1);
+const PROGRESS_SEGMENTS = Array.from({ length: 10 }, (_, index) => index + 1);
 
 interface ProjectCardProgressProps {
 	projectName: string;
@@ -17,10 +17,11 @@ export function ProjectCardProgress({
 	variant,
 }: ProjectCardProgressProps) {
 	const progress = calculateProjectProgress(completedTaskCount, taskCount);
+	const filledSegmentCount = Math.round(progress / 10);
 	const isDashboard = variant === "dashboard";
 
 	return (
-		<div className={isDashboard ? "px-5 pb-3 pt-4" : "px-4.5 pb-3 pt-3.5"}>
+		<div className={isDashboard ? "px-5 pb-3 pt-4" : "px-4 py-2.5"}>
 			<div
 				className={
 					isDashboard
@@ -34,17 +35,18 @@ export function ProjectCardProgress({
 				</span>
 			</div>
 			<div
-				className={isDashboard ? "mt-2.5 flex gap-1.25" : "mt-2 flex gap-1"}
+				className={isDashboard ? "mt-2.5 flex gap-1.25" : "mt-1.5 flex gap-1"}
 				role="progressbar"
 				aria-label={`${projectName} progress`}
 				aria-valuemin={0}
 				aria-valuemax={100}
 				aria-valuenow={progress}
+				aria-valuetext={`${completedTaskCount} of ${taskCount} tasks completed`}
 			>
-				{progressSegments.map((segment) => (
+				{PROGRESS_SEGMENTS.map((segment) => (
 					<span
 						key={segment}
-						className={`h-2.5 min-w-0 flex-1 rounded-full ${segment <= Math.round(progress / 10) ? "bg-brand" : "bg-[#ffb79d]"}`}
+						className={`${isDashboard ? "h-2.5" : "h-2"} min-w-0 flex-1 rounded-full ${segment <= filledSegmentCount ? "bg-brand" : "bg-brand-soft"}`}
 					/>
 				))}
 			</div>

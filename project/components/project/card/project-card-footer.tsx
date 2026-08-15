@@ -1,4 +1,5 @@
 import { UserRound } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { ProjectCardProject, ProjectCardVariant } from "./types";
 import { getProjectDatePresentation } from "./utils/project-card-utils";
 
@@ -23,28 +24,29 @@ export function ProjectCardFooter({
 			className={
 				isDashboard
 					? "flex items-center justify-between px-5 py-3"
-					: "flex min-w-0 items-center justify-between gap-2 px-[18px] py-3"
+					: "flex min-w-0 items-center justify-between gap-2 px-4 py-2.5"
 			}
 		>
 			<div
 				className={`flex items-center ${isDashboard ? "gap-2" : "min-w-0 gap-1.5"}`}
 			>
 				<span
-					className={`flex shrink-0 items-center justify-center rounded-full border-2 border-border bg-brand text-white ${isDashboard ? "size-8" : "size-7"}`}
+					className={`flex shrink-0 items-center justify-center rounded-full border-2 border-border bg-brand text-white ${isDashboard ? "size-8" : "size-6"}`}
 				>
-					<UserRound size={isDashboard ? 16 : 14} />
+					<UserRound size={isDashboard ? 16 : 12} />
 				</span>
-				<span
-					className={`rounded-full bg-[#ffb79d] font-display font-bold text-brand ${isDashboard ? "px-2.5 py-0.5 text-[11px] leading-[16.5px]" : "truncate px-2 py-0.5 text-[10px]"}`}
+				<Badge
+					variant="secondary"
+					className={`border-0 bg-brand-soft font-display font-bold text-brand hover:bg-brand-soft ${isDashboard ? "px-2.5 py-0.5 text-[11px] leading-[16.5px]" : "truncate px-2 py-0.5 text-[10px]"}`}
 				>
 					{memberCount} {memberCount === 1 ? "member" : "members"}
-				</span>
+				</Badge>
 			</div>
-			<span
-				className={`shrink-0 rounded-xl font-display font-bold ${datePresentation.className} ${isDashboard ? "px-3 py-1.5 text-xs" : "px-2 py-1.5 text-[10px]"}`}
+			<Badge
+				className={`shrink-0 rounded-xl border-0 font-display font-bold ${datePresentation.badgeClassName} ${isDashboard ? "px-3 py-1.5 text-xs" : "px-2 py-1.5 text-[10px]"}`}
 			>
 				{datePresentation.label}
-			</span>
+			</Badge>
 		</div>
 	);
 }

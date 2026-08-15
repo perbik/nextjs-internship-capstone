@@ -21,14 +21,14 @@ export function ProjectCardHeader({
 			className={
 				isDashboard
 					? "flex items-start justify-between px-5 pt-5"
-					: "flex items-start justify-between gap-3 px-[18px] pt-[18px]"
+					: "flex items-start justify-between gap-3 px-4 pt-3"
 			}
 		>
 			<h2
 				className={
 					isDashboard
-						? "min-w-0 truncate font-display text-[22px] font-extrabold leading-[27.5px] text-foreground group-hover:text-brand"
-						: "min-w-0 truncate font-display text-xl font-extrabold leading-7 text-foreground transition-colors group-hover:text-brand"
+						? "min-w-0 flex-1 truncate font-display text-[22px] font-extrabold leading-[27.5px] text-foreground transition-colors group-hover:text-brand"
+						: "min-w-0 flex-1 truncate font-display text-lg font-extrabold leading-6 text-foreground transition-colors group-hover:text-brand"
 				}
 			>
 				{project.name}

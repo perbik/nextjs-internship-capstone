@@ -1,19 +1,23 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CalendarDays } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { forbidden, notFound } from "next/navigation";
+import { z } from "zod";
 import { KanbanBoard } from "@/components/kanban/kanban-board";
+import { formatProjectDate } from "@/components/project/card/utils/project-card-utils";
 import { ProjectActions } from "@/components/project/project-actions";
 import { ProjectCollaborators } from "@/components/project/project-collaborators";
 import { ProjectCollaboratorsDialog } from "@/components/project/project-collaborators-dialog";
-import { DebouncedSearchInput } from "@/components/shared/debounced-search-input";
 import { TaskFilters } from "@/components/task/task-filters";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import {
 	getEligibleTeamMembersForProject,
-	getManageableTeamsForUser,
 	getProjectBoard,
 } from "@/lib/db/queries";
 import { taskFilterSchema } from "@/lib/validations";
+
+const PROJECT_ID_SCHEMA = z.uuid();
 
 function firstValue(value: string | string[] | undefined) {
 	return Array.isArray(value) ? value[0] : value;
@@ -36,6 +40,11 @@ export default async function ProjectPage({
 		params,
 		searchParams,
 	]);
+
+	// Validate route and filter values before using them in database queries
+	const parsedProjectId = PROJECT_ID_SCHEMA.safeParse(projectId);
+	if (!parsedProjectId.success) notFound();
+
 	const parsedFilters = taskFilterSchema.safeParse({
 		q: firstValue(rawFilters.q),
 		priority: firstValue(rawFilters.priority),
@@ -44,18 +53,23 @@ export default async function ProjectPage({
 	const filters = parsedFilters.success ? parsedFilters.data : {};
 	const hasFilters = Boolean(filters.q || filters.priority || filters.assignee);
 	const user = await requireCurrentUser();
-	const board = await getProjectBoard(projectId, user.id, filters);
+	const boardResult = await getProjectBoard(
+		parsedProjectId.data,
+		user.id,
+		filters,
+	);
 
-	if (!board) notFound();
+	if (boardResult.status === "not_found") notFound();
+	if (boardResult.status === "forbidden") forbidden();
 
-	const { project, membership } = board;
-	const canManage =
-		membership?.role === "owner" || membership?.role === "admin";
+	const { project, membership } = boardResult;
+	// Derive permissions from the authenticated user's project membership
+	const actorRole =
+		membership?.role === "owner" || membership?.role === "admin"
+			? membership.role
+			: null;
+	const canManage = Boolean(actorRole);
 	const canDelete = project.ownerId === user.id;
-	const manageableTeams =
-		canDelete && !project.teamId
-			? await getManageableTeamsForUser(user.id)
-			: [];
 	const members = project.members.map(({ user: member, role }) => ({
 		id: member.id,
 		name:
@@ -84,6 +98,7 @@ export default async function ProjectPage({
 		name: label.name,
 		color: label.color,
 	}));
+	// Convert relational task labels into the shape expected by the board
 	const boardLists = project.lists.map((list) => ({
 		...list,
 		tasks: list.tasks.map((task) => ({
@@ -100,94 +115,77 @@ export default async function ProjectPage({
 		0,
 	);
 	const status = statusDetails[project.status];
-	const formattedDate = project.dueDate?.toLocaleDateString("en-US", {
-		month: "short",
-		day: "numeric",
-	});
-	const dateLabel = project.dueDate
-		? project.status === "completed"
-			? `Completed on ${formattedDate}`
-			: project.status === "on_hold"
-				? `Paused until ${formattedDate}`
-				: `Due on ${formattedDate}`
-		: "No due date";
+	const formattedDate = project.dueDate
+		? formatProjectDate(project.dueDate)
+		: null;
+	const dateLabel = project.dueDate ? `Due on ${formattedDate}` : "No due date";
 
 	return (
-		<div className="min-w-0 max-w-full space-y-4">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-				<div className="min-w-0 flex-1">
-					<DebouncedSearchInput
-						initialValue={filters.q}
-						placeholder="Search task title or description"
-						maxLength={200}
-						accessibleLabel="Search tasks"
-						variant="pill"
-					/>
-				</div>
-				<ProjectActions
-					project={{
-						id: project.id,
-						name: project.name,
-						description: project.description,
-						status: project.status,
-						dueDate: project.dueDate?.toISOString() ?? null,
-					}}
-					canManage={canManage}
-					canDelete={canDelete}
-					variant="manage"
-					labels={labels}
-				/>
-			</div>
-
-			<section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_6px_rgba(0,0,0,0.06)]  ">
-				<div className="flex items-center justify-between border-b border-border px-4 py-2.5 ">
-					<Link
-						href="/projects"
-						className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-muted px-3 text-sm font-semibold text-muted-foreground hover:text-brand  dark:bg-card/5"
-					>
-						<ArrowLeft size={14} />
-						Back
-					</Link>
-					<span
-						className={`rounded-full px-4 py-1.5 text-sm font-bold ${status.classes}`}
-					>
-						{status.label}
-					</span>
-				</div>
-
-				<div className="px-5 py-4">
-					<h1 className="font-display text-3xl font-extrabold tracking-[-0.75px] text-foreground ">
-						{project.name}
-					</h1>
-					<p className="mt-1.5 text-sm text-muted-foreground">
-						{project.description || "No project description"}
-					</p>
-				</div>
-
-				<div className="flex flex-col gap-3 border-t border-border px-5 py-3 sm:flex-row sm:items-center ">
-					<ProjectCollaborators members={members} variant="stack" />
-					{canManage && membership && (
-						<ProjectCollaboratorsDialog
-							projectId={project.id}
-							members={members}
-							actorRole={membership.role as "owner" | "admin"}
-							eligibleMembers={availableTeamMembers}
-							manageableTeams={manageableTeams}
-							showTeamAssignment={canDelete && !project.teamId}
+		<div className="min-w-0 max-w-full space-y-3">
+			<section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+				<div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+					<div className="flex min-w-0 items-start gap-3">
+						<Button
+							asChild
+							size="icon"
+							className="size-8 shrink-0 rounded-full border-border"
+						>
+							<Link href="/projects" aria-label="Back to projects">
+								<ArrowLeft aria-hidden="true" />
+							</Link>
+						</Button>
+						<div className="min-w-0">
+							<div className="flex flex-wrap items-center gap-2">
+								<h1 className="truncate font-display text-xl font-extrabold tracking-[-0.03em] text-foreground sm:text-2xl">
+									{project.name}
+								</h1>
+								<Badge
+									className={`shrink-0 border-0 px-2.5 py-0.5 text-[11px] font-bold ${status.classes}`}
+								>
+									{status.label}
+								</Badge>
+								<Badge
+									variant="outline"
+									className="gap-1.5 rounded-full border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground"
+								>
+									<CalendarDays
+										className="size-3.5 text-brand"
+										aria-hidden="true"
+									/>
+									{dateLabel}
+								</Badge>
+							</div>
+							<p className="mt-0.5 max-w-2xl truncate text-sm text-muted-foreground">
+								{project.description || "No project description"}
+							</p>
+						</div>
+					</div>
+					<div className="flex flex-wrap items-center gap-2 sm:gap-1">
+						<ProjectCollaborators members={members} />
+						{actorRole && (
+							<ProjectCollaboratorsDialog
+								projectId={project.id}
+								members={members}
+								actorRole={actorRole}
+								eligibleMembers={availableTeamMembers}
+							/>
+						)}
+						<ProjectActions
+							project={{
+								id: project.id,
+								name: project.name,
+								description: project.description,
+								status: project.status,
+								dueDate: project.dueDate?.toISOString() ?? null,
+							}}
+							canManage={canManage}
+							canDelete={canDelete}
+							variant="manage"
+							labels={labels}
 						/>
-					)}
-					<span className="rounded-full bg-[#4c99ff]/13 px-4 py-2 text-sm font-semibold text-[#1a4fa0]">
-						{dateLabel}
-					</span>
+					</div>
 				</div>
 			</section>
-
-			{hasFilters && (
-				<p className="text-sm text-muted-foreground">
-					Showing {matchingTaskCount} matching{" "}
-					{matchingTaskCount === 1 ? "task" : "tasks"}
-				</p>
-			)}
 
 			<KanbanBoard
 				projectId={project.id}
@@ -196,14 +194,24 @@ export default async function ProjectPage({
 				labels={labels}
 				canManage={canManage}
 				dragEnabled={!hasFilters}
+				initialTaskId={firstValue(rawFilters.task)}
 				filterControl={
-					<TaskFilters
-						key="project-task-filters"
-						projectId={project.id}
-						priority={filters.priority}
-						assignee={filters.assignee}
-						members={members}
-					/>
+					<>
+						<TaskFilters
+							key="project-task-filters"
+							projectId={project.id}
+							query={filters.q}
+							priority={filters.priority}
+							assignee={filters.assignee}
+							members={members}
+						/>
+						{hasFilters && (
+							<p className="text-xs text-muted-foreground" aria-live="polite">
+								Showing {matchingTaskCount} matching{" "}
+								{matchingTaskCount === 1 ? "task" : "tasks"}
+							</p>
+						)}
+					</>
 				}
 			/>
 		</div>

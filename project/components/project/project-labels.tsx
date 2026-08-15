@@ -7,6 +7,8 @@ import {
 	type LabelActionState,
 } from "@/app/(dashboard)/projects/[id]/label-actions";
 import { InlineNewLabelForm } from "@/components/project/new-label-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DestructiveActionDialog } from "@/components/ui/destructive-action-dialog";
 
 export interface TaskLabelOption {
@@ -29,30 +31,32 @@ export function ProjectLabels({
 	canManage,
 }: ProjectLabelsProps) {
 	return (
-		<section className="rounded-xl border border-border bg-surface-muted px-4 py-3  ">
-			<div className="flex flex-col gap-3">
+		<section className="rounded-xl border border-border bg-surface-muted px-3 py-2.5">
+			<div className="flex flex-col gap-2">
 				<div className="flex flex-wrap items-center gap-2">
 					<span className="flex items-center gap-2 font-display text-sm font-bold text-foreground ">
 						<Tag size={16} className="text-brand" />
-						Project labels
+						Task labels
 					</span>
 					{labels.length === 0 && (
-						<span className="text-xs text-muted-foreground">No labels yet</span>
+						<span className="text-xs text-muted-foreground">
+							No project labels yet
+						</span>
 					)}
 					{labels.map((label) => (
-						<span
+						<Badge
 							key={label.id}
-							className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-white"
+							className="gap-1 border-0 px-2 py-1 text-xs font-medium text-white hover:opacity-90"
+							// Label colors come from the database, so they use an inline style
 							style={{ backgroundColor: label.color }}
 						>
 							{label.name}
-							{canManage && (
-								<DeleteLabelDialog projectId={projectId} label={label} />
-							)}
-						</span>
+							{canManage && <DeleteLabelDialog label={label} />}
+						</Badge>
 					))}
 				</div>
 
+				{/* Only project managers can create or remove labels */}
 				{canManage && (
 					<div className="w-full">
 						<InlineNewLabelForm projectId={projectId} />
@@ -63,13 +67,7 @@ export function ProjectLabels({
 	);
 }
 
-function DeleteLabelDialog({
-	projectId,
-	label,
-}: {
-	projectId: string;
-	label: TaskLabelOption;
-}) {
+function DeleteLabelDialog({ label }: { label: TaskLabelOption }) {
 	const [state, action, isPending] = useActionState(
 		deleteLabelAction,
 		initialState,
@@ -80,21 +78,20 @@ function DeleteLabelDialog({
 			title={`Delete ${label.name}?`}
 			description="This label will be removed from the project and from every task currently using it."
 			action={action}
-			fields={[
-				{ name: "projectId", value: projectId },
-				{ name: "labelId", value: label.id },
-			]}
+			fields={[{ name: "labelId", value: label.id }]}
 			confirmLabel="Delete label"
 			error={state.success ? undefined : state.message}
 			trigger={
-				<button
+				<Button
 					type="button"
+					variant="ghost"
+					size="icon"
 					disabled={isPending}
 					aria-label={`Delete ${label.name} label`}
-					className="rounded-full p-0.5 hover:bg-black/20"
+					className="size-4 rounded-full text-white hover:bg-black/20 hover:text-white"
 				>
 					<X size={11} />
-				</button>
+				</Button>
 			}
 		/>
 	);

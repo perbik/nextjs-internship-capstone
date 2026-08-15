@@ -7,10 +7,11 @@ import {
 	type MemberActionState,
 	removeProjectMemberAction,
 } from "@/app/(dashboard)/projects/[id]/member-actions";
+import { Button } from "@/components/ui/button";
 import { DestructiveActionDialog } from "@/components/ui/destructive-action-dialog";
 import type { ManagedProjectMember } from "./types";
 
-const initialState: MemberActionState = { message: "" };
+const INITIAL_MEMBER_STATE: MemberActionState = { message: "" };
 
 interface RemoveMemberFormProps {
 	projectId: string;
@@ -21,7 +22,7 @@ export function RemoveMemberForm({ projectId, member }: RemoveMemberFormProps) {
 	const router = useRouter();
 	const [state, action, isPending] = useActionState(
 		removeProjectMemberAction,
-		initialState,
+		INITIAL_MEMBER_STATE,
 	);
 
 	useEffect(() => {
@@ -43,15 +44,17 @@ export function RemoveMemberForm({ projectId, member }: RemoveMemberFormProps) {
 			pendingLabel="Removing..."
 			error={state.success ? undefined : state.message}
 			trigger={
-				<button
+				<Button
 					type="button"
+					variant="ghost"
+					size="sm"
 					disabled={isPending}
 					aria-label={`Remove ${member.name} from project`}
-					className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-950/30"
+					className="text-destructive hover:bg-destructive/10 hover:text-destructive"
 				>
 					<Trash2 size={14} />
 					Remove
-				</button>
+				</Button>
 			}
 		/>
 	);

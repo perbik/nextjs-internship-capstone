@@ -4,20 +4,23 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { ProjectCard } from "@/components/project/card";
+import { Button } from "@/components/ui/button";
 import type { ProjectSummary } from "@/lib/db/queries";
 
-export function RecentProjectsPanel({
-	projects,
-}: {
+interface RecentProjectsPanelProps {
 	projects: ProjectSummary[];
-}) {
+}
+
+export function RecentProjectsPanel({ projects }: RecentProjectsPanelProps) {
 	const [activeIndex, setActiveIndex] = useState(0);
-	const project = projects[activeIndex];
+	const visibleIndex = Math.min(activeIndex, Math.max(projects.length - 1, 0));
+	const project = projects[visibleIndex];
 	const hasMultiple = projects.length > 1;
 
 	function move(direction: -1 | 1) {
+		// Wrap navigation at either end of the recent-project list
 		setActiveIndex(
-			(current) => (current + direction + projects.length) % projects.length,
+			(visibleIndex + direction + projects.length) % projects.length,
 		);
 	}
 
@@ -47,40 +50,46 @@ export function RecentProjectsPanel({
 
 			{project && (
 				<div className="flex items-center justify-between px-5 py-3">
-					<button
+					<Button
 						type="button"
+						variant="ghost"
+						size="icon"
 						aria-label="Previous recent project"
 						disabled={!hasMultiple}
 						onClick={() => move(-1)}
-						className="flex size-8 items-center justify-center rounded-full bg-control-muted text-muted-foreground hover:bg-brand-light hover:text-brand disabled:opacity-40  dark:text-muted-foreground"
+						className="size-8 rounded-full bg-control-muted text-muted-foreground hover:bg-brand-light hover:text-brand disabled:opacity-40"
 					>
 						<ChevronLeft size={14} />
-					</button>
+					</Button>
 
 					<fieldset className="flex items-center gap-1.5">
 						<legend className="sr-only">
-							Project {activeIndex + 1} of {projects.length}
+							Choose a recent project. Project {visibleIndex + 1} of{" "}
+							{projects.length} is currently shown.
 						</legend>
 						{projects.map(({ project: item }, index) => (
 							<button
 								type="button"
 								key={item.id}
 								aria-label={`Show ${item.name}`}
+								aria-pressed={index === visibleIndex}
 								onClick={() => setActiveIndex(index)}
-								className={`h-1.5 rounded-full ${index === activeIndex ? "w-4 bg-brand" : "w-1.5 bg-black/15 dark:bg-white/35"}`}
+								className={`h-1.5 rounded-full ${index === visibleIndex ? "w-4 bg-brand" : "w-1.5 bg-black/15 dark:bg-white/35"}`}
 							/>
 						))}
 					</fieldset>
 
-					<button
+					<Button
 						type="button"
+						variant="ghost"
+						size="icon"
 						aria-label="Next recent project"
 						disabled={!hasMultiple}
 						onClick={() => move(1)}
-						className="flex size-8 items-center justify-center rounded-full bg-control-muted text-muted-foreground hover:bg-brand-light hover:text-brand disabled:opacity-40  dark:text-muted-foreground"
+						className="size-8 rounded-full bg-control-muted text-muted-foreground hover:bg-brand-light hover:text-brand disabled:opacity-40"
 					>
 						<ChevronRight size={14} />
-					</button>
+					</Button>
 				</div>
 			)}
 		</section>

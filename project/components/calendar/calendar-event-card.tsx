@@ -1,31 +1,58 @@
 import Link from "next/link";
 import type { CalendarEvent } from "@/lib/calendar/types";
+import { cn } from "@/lib/utils";
+
+interface CalendarEventCardProps {
+	event: CalendarEvent;
+	compact?: boolean;
+}
+
+interface CalendarEventStackProps {
+	events: CalendarEvent[];
+	limit: number;
+	moreHref: string;
+}
+
+function getEventColorClasses(event: CalendarEvent) {
+	if (event.completed) {
+		return "bg-green-500/10 text-green-700 dark:text-green-300";
+	}
+	if (event.type === "project" || event.priority === "high") {
+		return "bg-brand/15 text-brand";
+	}
+	if (event.priority === "medium") {
+		return "bg-amber-500/15 text-amber-600 dark:text-amber-300";
+	}
+	return "bg-sky-500/15 text-sky-600 dark:text-sky-300";
+}
 
 export function CalendarEventCard({
 	event,
 	compact = false,
-}: {
-	event: CalendarEvent;
-	compact?: boolean;
-}) {
-	const color = event.completed
-		? "bg-green-500/10 text-green-700 dark:text-green-300"
-		: event.type === "project" || event.priority === "high"
-			? "bg-brand/15 text-brand"
-			: event.priority === "medium"
-				? "bg-amber-500/15 text-amber-600 dark:text-amber-300"
-				: "bg-sky-500/15 text-sky-600 dark:text-sky-300";
+}: CalendarEventCardProps) {
+	// Task links open the project and its existing task-details modal
+	const href =
+		event.type === "task"
+			? `/projects/${event.projectId}?task=${event.id}`
+			: `/projects/${event.projectId}`;
 
 	return (
 		<Link
-			href={`/projects/${event.projectId}`}
+			href={href}
 			title={`${event.title} · ${event.projectName}`}
-			className={`block truncate rounded px-1.5 py-0.5 font-medium ${compact ? "text-[10px] sm:text-[11px]" : "text-sm"} ${color}`}
+			aria-label={`${event.title}, ${event.projectName}`}
+			className={cn(
+				"block rounded px-1.5 py-0.5 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+				compact ? "text-[10px] sm:text-[11px]" : "text-sm",
+				getEventColorClasses(event),
+			)}
 		>
-			{event.type === "project" ? "Project: " : ""}
-			{event.title}
+			<span className="block truncate">
+				{event.type === "project" ? "Project: " : ""}
+				{event.title}
+			</span>
 			{!compact && (
-				<span className="mt-1 block text-xs opacity-75">
+				<span className="mt-1 block truncate text-xs opacity-75">
 					{event.projectName}
 				</span>
 			)}
@@ -36,10 +63,8 @@ export function CalendarEventCard({
 export function CalendarEventStack({
 	events,
 	limit,
-}: {
-	events: CalendarEvent[];
-	limit: number;
-}) {
+	moreHref,
+}: CalendarEventStackProps) {
 	return (
 		<div className="mt-1 space-y-1">
 			{events.slice(0, limit).map((event) => (
@@ -50,9 +75,12 @@ export function CalendarEventStack({
 				/>
 			))}
 			{events.length > limit && (
-				<p className="px-1 text-[10px] text-muted-foreground">
+				<Link
+					href={moreHref}
+					className="block rounded px-1 text-[10px] font-medium text-muted-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+				>
 					+{events.length - limit} more
-				</p>
+				</Link>
 			)}
 		</div>
 	);

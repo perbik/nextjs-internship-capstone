@@ -1,3 +1,4 @@
+import { AnalyticsScopeFilter } from "@/components/analytics/analytics-scope-filter";
 import { ProjectProgressCard } from "@/components/analytics/project-progress-card";
 import {
 	TeamActivityCard,
@@ -5,10 +6,12 @@ import {
 } from "@/components/analytics/team-activity-card";
 import { MetricCard } from "@/components/shared/metric-card";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { getAnalyticsData } from "@/lib/db/queries";
+import type { ActivityAction } from "@/lib/db/mutations/activities";
+import { getAnalyticsData, getAnalyticsScopeOptions } from "@/lib/db/queries";
 
-const activityLabels: Record<string, string> = {
+const ACTIVITY_LABELS = {
 	task_created: "created a task",
+	task_updated: "updated a task",
 	task_field_changed: "updated a task",
 	task_moved: "moved a task",
 	task_reordered: "reordered a task",
@@ -18,7 +21,7 @@ const activityLabels: Record<string, string> = {
 	comment_added: "added a comment",
 	comment_updated: "edited a comment",
 	comment_deleted: "deleted a comment",
-};
+} satisfies Partial<Record<ActivityAction, string>>;
 
 function actorName(actor: {
 	firstName: string | null;
@@ -30,9 +33,49 @@ function actorName(actor: {
 	);
 }
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+	searchParams,
+}: {
+	searchParams: Promise<{
+		team?: string | string[];
+		activityPage?: string | string[];
+	}>;
+}) {
 	const user = await requireCurrentUser();
-	const { metrics, recentActivity } = await getAnalyticsData(user.id);
+	const params = await searchParams;
+	const requestedScope = Array.isArray(params.team)
+		? params.team[0]
+		: params.team;
+	const requestedActivityPage = Array.isArray(params.activityPage)
+		? params.activityPage[0]
+		: params.activityPage;
+	const activityPage = Math.max(
+		1,
+		Number.parseInt(requestedActivityPage ?? "1", 10) || 1,
+	);
+	const scopeOptions = await getAnalyticsScopeOptions(user.id);
+	const selectedTeam = scopeOptions.teams.find(
+		(team) => team.id === requestedScope,
+	);
+	const selectedScope = selectedTeam
+		? selectedTeam.id
+		: requestedScope === "standalone" && scopeOptions.hasStandaloneProjects
+			? "standalone"
+			: "all";
+	const scope =
+		selectedScope === "standalone"
+			? { standalone: true }
+			: selectedTeam
+				? { teamId: selectedTeam.id }
+				: {};
+	const scopeLabel =
+		selectedScope === "standalone"
+			? "standalone projects"
+			: selectedTeam
+				? selectedTeam.name
+				: "all your accessible work";
+	const { metrics, recentActivity, activityPagination } =
+		await getAnalyticsData(user.id, scope, activityPage);
 	const metricCards = [
 		{
 			label: "Team Efficiency",
@@ -56,16 +99,18 @@ export default async function AnalyticsPage() {
 		},
 	];
 	const activities: TeamActivityItem[] = recentActivity.map(
-		({ activity, projectName, actor }) => ({
+		({ activity, projectName, teamName, actor }) => ({
 			id: activity.id,
 			actorName: actor ? actorName(actor) : "Former member",
-			action: activityLabels[activity.action] ?? activity.action,
+			action:
+				ACTIVITY_LABELS[activity.action as ActivityAction] ?? activity.action,
 			taskTitle:
 				typeof activity.metadata.title === "string"
 					? activity.metadata.title
 					: undefined,
 			projectId: activity.projectId,
 			projectName,
+			teamName: teamName ?? "Standalone project",
 			date: activity.createdAt.toLocaleDateString("en-US", {
 				month: "2-digit",
 				day: "2-digit",
@@ -76,13 +121,20 @@ export default async function AnalyticsPage() {
 
 	return (
 		<div className="space-y-5">
-			<header>
-				<h1 className="font-display text-3xl font-extrabold tracking-[-0.03em] text-foreground sm:text-4xl ">
-					Analytics
-				</h1>
-				<p className="mt-1 text-sm text-muted-foreground ">
-					Live project and task insights from your accessible work
-				</p>
+			<header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+				<div>
+					<h1 className="font-display text-3xl font-extrabold tracking-[-0.03em] text-foreground sm:text-4xl ">
+						Analytics
+					</h1>
+					<p className="mt-1 text-sm text-muted-foreground ">
+						Live project and task insights for {scopeLabel}
+					</p>
+				</div>
+				<AnalyticsScopeFilter
+					value={selectedScope}
+					teams={scopeOptions.teams}
+					hasStandaloneProjects={scopeOptions.hasStandaloneProjects}
+				/>
 			</header>
 
 			<div className="grid grid-cols-2 gap-3 lg:grid-cols-4 sm:gap-4">
@@ -97,7 +149,13 @@ export default async function AnalyticsPage() {
 					completedTasks={metrics.completedTasks}
 					totalTasks={metrics.totalTasks}
 				/>
-				<TeamActivityCard activities={activities} />
+				<TeamActivityCard
+					activities={activities}
+					page={activityPagination.page}
+					totalPages={activityPagination.totalPages}
+					selectedScope={selectedScope}
+					showTeam={selectedScope === "all"}
+				/>
 			</div>
 		</div>
 	);

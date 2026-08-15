@@ -24,68 +24,32 @@ export default async function DashboardPage() {
 		{
 			label: "Active Projects",
 			value: stats.activeProjects,
-			trend: "+2.5%",
-			direction: "up" as const,
+			detail: "Across accessible projects",
 		},
 		{
 			label: "Team Members",
 			value: stats.teamMembers,
-			trend: "+4.1%",
-			direction: "up" as const,
+			detail: "Across accessible projects",
 		},
 		{
 			label: "Completed Tasks",
 			value: stats.completedTasks,
-			trend: "+12.3%",
-			direction: "up" as const,
+			detail: "Current total",
 		},
 		{
 			label: "Pending Tasks",
 			value: stats.pendingTasks,
-			trend: "-2.1%",
-			direction: "down" as const,
+			detail: "Current total",
 		},
 	];
-	const taskOptions = taskCreationProjects.map((project) => {
-		const currentMembership = project.members.find(
-			(member) => member.userId === user.id,
-		);
-
-		return {
-			id: project.id,
-			name: project.name,
-			lists: project.lists.map((list) => ({ id: list.id, name: list.name })),
-			members: project.members
-				.filter(({ user: member }) => !member.deletedAt)
-				.map(({ user: member }) => ({
-					id: member.id,
-					name:
-						[member.firstName, member.lastName].filter(Boolean).join(" ") ||
-						member.email,
-					isCurrentUser: member.id === user.id,
-				})),
-			labels: project.labels.map((label) => ({
-				id: label.id,
-				name: label.name,
-				color: label.color,
-			})),
-			canManageLabels:
-				project.ownerId === user.id ||
-				currentMembership?.role === "owner" ||
-				currentMembership?.role === "admin",
-		};
-	});
-
 	return (
 		<div className="space-y-6">
 			<header>
-				<p className="text-sm text-muted-foreground dark:text-muted-foreground">
-					Good Morning,
-				</p>
+				<p className="text-sm text-muted-foreground">Welcome,</p>
 				<h1 className="mt-0.5 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
 					{name}!
 				</h1>
-				<p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
+				<p className="mt-1 text-sm text-muted-foreground">
 					Welcome back. Here is the latest overview of your work.
 				</p>
 			</header>
@@ -99,9 +63,14 @@ export default async function DashboardPage() {
 			<div className="grid gap-5 lg:grid-cols-2">
 				<DashboardQuickActions
 					createProjectAction={
-						<CreateProjectModal teams={manageableTeams} dashboardLabel />
+						<CreateProjectModal
+							teams={manageableTeams}
+							triggerVariant="dashboard"
+						/>
 					}
-					createTaskAction={<DashboardCreateTaskModal projects={taskOptions} />}
+					createTaskAction={
+						<DashboardCreateTaskModal projects={taskCreationProjects} />
+					}
 					addTeamMemberAction={<AddTeamMemberDialog teams={manageableTeams} />}
 				/>
 				<RecentProjectsPanel projects={recentProjects} />

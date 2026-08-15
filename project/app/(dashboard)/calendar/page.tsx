@@ -1,4 +1,3 @@
-import { CalendarTaskModal } from "@/components/calendar/calendar-task-modal";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import {
 	DayCalendarView,
@@ -6,6 +5,7 @@ import {
 	WeekCalendarView,
 } from "@/components/calendar/calendar-views";
 import { DeadlineList } from "@/components/calendar/deadline-list";
+import { CalendarCreateTaskModal } from "@/components/task/create-task-modal";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import {
 	calendarRange,
@@ -27,7 +27,10 @@ export default async function CalendarPage({
 	const view: CalendarView =
 		rawView === "week" || rawView === "day" ? rawView : "month";
 	const anchor = parseCalendarDate(firstValue(params.date));
-	const deadlinePage = Number(firstValue(params.deadlinePage)) || 1;
+	const deadlinePage = Math.max(
+		1,
+		Number.parseInt(firstValue(params.deadlinePage) ?? "1", 10) || 1,
+	);
 	const range = calendarRange(view, anchor);
 	const today = parseCalendarDate(undefined);
 	const user = await requireCurrentUser();
@@ -53,25 +56,6 @@ export default async function CalendarPage({
 		const key = dateKey(event.dueDate);
 		eventsByDate.set(key, [...(eventsByDate.get(key) ?? []), event]);
 	}
-	const taskOptions = taskCreationProjects.map((project) => ({
-		id: project.id,
-		name: project.name,
-		lists: project.lists.map((list) => ({ id: list.id, name: list.name })),
-		members: project.members
-			.filter(({ user: member }) => !member.deletedAt)
-			.map(({ user: member }) => ({
-				id: member.id,
-				name:
-					[member.firstName, member.lastName].filter(Boolean).join(" ") ||
-					member.email,
-				isCurrentUser: member.id === user.id,
-			})),
-		labels: project.labels.map((label) => ({
-			id: label.id,
-			name: label.name,
-			color: label.color,
-		})),
-	}));
 	const monthEvents = events.filter(
 		(event) =>
 			event.dueDate.getUTCMonth() === anchor.getUTCMonth() &&
@@ -96,10 +80,10 @@ export default async function CalendarPage({
 					rangeStart={range.start}
 					previous={moveCalendarAnchor(view, anchor, -1)}
 					next={moveCalendarAnchor(view, anchor, 1)}
-					addEventAction={
-						<CalendarTaskModal
+					addTaskAction={
+						<CalendarCreateTaskModal
 							defaultDueDate={dateKey(anchor)}
-							projects={taskOptions}
+							projects={taskCreationProjects}
 						/>
 					}
 				/>

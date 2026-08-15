@@ -1,125 +1,110 @@
-import { Filter, Plus, Search } from "lucide-react";
+import { FolderOpen, X } from "lucide-react";
+import Link from "next/link";
+import { CreateProjectModal } from "@/components/project/create-project-modal";
+import { ProjectFilters } from "@/components/project/project-filters";
+import { ProjectGrid } from "@/components/project/project-grid";
+import { ProjectPagination } from "@/components/project/project-pagination";
+import { SearchBar } from "@/components/shared/search-bar";
+import { Button } from "@/components/ui/button";
+import { requireCurrentUser } from "@/lib/auth/current-user";
+import {
+	getManageableTeamsForUser,
+	getProjectSummariesPageForUser,
+} from "@/lib/db/queries";
+import { projectFilterSchema } from "@/lib/validations";
 
-export default function ProjectsPage() {
+// Use the first value when a URL parameter is repeated
+function firstValue(value: string | string[] | undefined) {
+	return Array.isArray(value) ? value[0] : value;
+}
+
+// Start from page one after changing the search
+const PROJECT_SEARCH_RESET_PARAMS = ["page"];
+
+export default async function ProjectsPage({
+	searchParams,
+}: {
+	searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+	// Validate URL filters before using them in database queries
+	const rawFilters = await searchParams;
+	const parsedFilters = projectFilterSchema.safeParse({
+		q: firstValue(rawFilters.q),
+		status: firstValue(rawFilters.status),
+		role: firstValue(rawFilters.role),
+		page: firstValue(rawFilters.page),
+	});
+	const filters = parsedFilters.success ? parsedFilters.data : { page: 1 };
+	const hasFilters = Boolean(filters.q || filters.status || filters.role);
+	const user = await requireCurrentUser();
+
+	// Load project results and available teams at the same time
+	const [projectPage, manageableTeams] = await Promise.all([
+		getProjectSummariesPageForUser(user.id, filters),
+		getManageableTeamsForUser(user.id),
+	]);
+	const { projects, page, totalPages } = projectPage;
+
 	return (
 		<div className="space-y-6">
-			<div className="flex justify-between items-center">
-				<div>
-					<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
-						Projects
-					</h1>
-					<p className="text-paynes_gray-500 dark:text-french_gray-500 mt-2">
-						Manage and organize your team projects
-					</p>
+			{/* Page heading and project actions */}
+			<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+				<h1 className="font-display text-3xl font-extrabold tracking-[-0.9px] text-foreground sm:text-4xl">
+					Projects
+				</h1>
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+					<div className="w-full sm:w-80 lg:w-96">
+						<SearchBar
+							initialValue={filters.q}
+							placeholder="Search project name or description"
+							maxLength={100}
+							accessibleLabel="Search projects"
+							variant="pill"
+							resetParams={PROJECT_SEARCH_RESET_PARAMS}
+						/>
+					</div>
+					<CreateProjectModal teams={manageableTeams} triggerVariant="pill" />
 				</div>
-				<button
-					type="button"
-					className="inline-flex items-center px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors"
-				>
-					<Plus size={20} className="mr-2" />
-					New Project
-				</button>
 			</div>
 
-			{/* Implementation Tasks Banner */}
-			<div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-				<h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
-					📋 Projects Page Implementation Tasks
-				</h3>
-				<ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
-					<li>• Task 4.1: Implement project CRUD operations</li>
-					<li>• Task 4.2: Create project listing and dashboard interface</li>
-					<li>• Task 4.5: Design and implement project cards and layouts</li>
-					<li>
-						• Task 4.6: Add project and task search/filtering capabilities
-					</li>
-				</ul>
-			</div>
+			{/* Project filters and paginated results */}
+			<section className="rounded-[28px] border border-border bg-card p-4">
+				<ProjectFilters
+					status={filters.status}
+					role={filters.role}
+					pagination={
+						<ProjectPagination
+							filters={filters}
+							page={page}
+							totalPages={totalPages}
+						/>
+					}
+				/>
 
-			{/* Search and Filter Bar */}
-			<div className="flex flex-col sm:flex-row gap-4">
-				<div className="relative flex-1">
-					<Search
-						className="absolute left-3 top-1/2 transform -translate-y-1/2 text-paynes_gray-500 dark:text-french_gray-400"
-						size={16}
-					/>
-					<input
-						type="text"
-						placeholder="Search projects..."
-						className="w-full pl-10 pr-4 py-2 bg-white dark:bg-outer_space-500 border border-french_gray-300 dark:border-paynes_gray-400 rounded-lg text-outer_space-500 dark:text-platinum-500 placeholder-paynes_gray-500 dark:placeholder-french_gray-400 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500"
-					/>
-				</div>
-				<button
-					type="button"
-					className="inline-flex items-center px-4 py-2 border border-french_gray-300 dark:border-paynes_gray-400 text-outer_space-500 dark:text-platinum-500 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 transition-colors"
-				>
-					<Filter size={16} className="mr-2" />
-					Filter
-				</button>
-			</div>
-
-			{/* Projects Grid Placeholder */}
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-				{[1, 2, 3, 4, 5, 6].map((i) => (
-					<div
-						key={i}
-						className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6 hover:shadow-lg transition-shadow"
-					>
-						<div className="flex items-start justify-between mb-4">
-							<div className="w-3 h-3 bg-blue_munsell-500 rounded-full"></div>
-							<div className="text-sm text-paynes_gray-500 dark:text-french_gray-400">
-								{Math.floor(Math.random() * 30) + 1} days left
-							</div>
-						</div>
-
-						<h3 className="text-lg font-semibold text-outer_space-500 dark:text-platinum-500 mb-2">
-							Sample Project {i}
-						</h3>
-
-						<p className="text-sm text-paynes_gray-500 dark:text-french_gray-400 mb-4">
-							This is a placeholder project description that will be replaced
-							with actual project data.
+				{projects.length > 0 ? (
+					<ProjectGrid projects={projects} />
+				) : (
+					<div className="rounded-2xl border border-dashed border-input px-6 py-14 text-center">
+						<FolderOpen size={40} className="mx-auto text-brand" />
+						<h2 className="mt-4 font-display text-lg font-bold text-foreground">
+							{hasFilters ? "No matching projects" : "No projects yet"}
+						</h2>
+						<p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+							{hasFilters
+								? "Try another search term or clear one of the active filters."
+								: "Your projects will appear here after you create one or join a team project."}
 						</p>
-
-						<div className="flex items-center justify-between text-sm text-paynes_gray-500 dark:text-french_gray-400 mb-4">
-							<span>{Math.floor(Math.random() * 8) + 2} members</span>
-							<span>{Math.floor(Math.random() * 20) + 5} tasks</span>
-						</div>
-
-						<div className="w-full bg-french_gray-300 dark:bg-paynes_gray-400 rounded-full h-2">
-							<div
-								className="bg-blue_munsell-500 h-2 rounded-full"
-								style={{ width: `${Math.floor(Math.random() * 80) + 20}%` }}
-							></div>
-						</div>
+						{hasFilters && (
+							<Button asChild variant="outline" className="mt-4 rounded-full">
+								<Link href="/projects">
+									<X size={16} />
+									Clear filters
+								</Link>
+							</Button>
+						)}
 					</div>
-				))}
-			</div>
-
-			{/* Component Placeholders */}
-			<div className="mt-8 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-				<h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
-					📁 Components to Implement
-				</h3>
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
-					<div>
-						<strong>components/project-card.tsx</strong>
-						<p>Project display component with progress, members, and actions</p>
-					</div>
-					<div>
-						<strong>components/modals/create-project-modal.tsx</strong>
-						<p>Modal for creating new projects with form validation</p>
-					</div>
-					<div>
-						<strong>hooks/use-projects.ts</strong>
-						<p>Custom hook for project data fetching and mutations</p>
-					</div>
-					<div>
-						<strong>lib/db/schema.ts</strong>
-						<p>Database schema for projects, lists, and tasks</p>
-					</div>
-				</div>
-			</div>
+				)}
+			</section>
 		</div>
 	);
 }

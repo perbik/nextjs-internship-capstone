@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 
+// Get an active user by their database ID
 export async function getUserById(userId: string) {
 	const [user] = await db
 		.select()
@@ -12,6 +13,7 @@ export async function getUserById(userId: string) {
 	return user ?? null;
 }
 
+// Get an active user linked to a Clerk account
 export async function getUserByClerkId(clerkId: string) {
 	const [user] = await db
 		.select()
@@ -22,7 +24,9 @@ export async function getUserByClerkId(clerkId: string) {
 	return user ?? null;
 }
 
+// Get active users from a list of database IDs
 export async function getUsersByIds(userIds: string[]) {
+	// Skip the database query when the list is empty
 	if (userIds.length === 0) {
 		return [];
 	}

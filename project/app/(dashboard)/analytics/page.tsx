@@ -1,113 +1,161 @@
-import { BarChart3, Clock, TrendingUp, Users } from "lucide-react";
+import { AnalyticsScopeFilter } from "@/components/analytics/analytics-scope-filter";
+import { ProjectProgressCard } from "@/components/analytics/project-progress-card";
+import {
+	TeamActivityCard,
+	type TeamActivityItem,
+} from "@/components/analytics/team-activity-card";
+import { MetricCard } from "@/components/shared/metric-card";
+import { requireCurrentUser } from "@/lib/auth/current-user";
+import type { ActivityAction } from "@/lib/db/mutations/activities";
+import { getAnalyticsData, getAnalyticsScopeOptions } from "@/lib/db/queries";
 
-export default function AnalyticsPage() {
+const ACTIVITY_LABELS = {
+	task_created: "created a task",
+	task_updated: "updated a task",
+	task_field_changed: "updated a task",
+	task_moved: "moved a task",
+	task_reordered: "reordered a task",
+	task_deleted: "deleted a task",
+	task_label_added: "added a task label",
+	task_label_removed: "removed a task label",
+	comment_added: "added a comment",
+	comment_updated: "edited a comment",
+	comment_deleted: "deleted a comment",
+} satisfies Partial<Record<ActivityAction, string>>;
+
+function actorName(actor: {
+	firstName: string | null;
+	lastName: string | null;
+	email: string;
+}) {
 	return (
-		<div className="space-y-6">
-			<div>
-				<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
-					Analytics
-				</h1>
-				<p className="text-paynes_gray-500 dark:text-french_gray-500 mt-2">
-					Track project performance and team productivity
-				</p>
-			</div>
+		[actor.firstName, actor.lastName].filter(Boolean).join(" ") || actor.email
+	);
+}
 
-			{/* Implementation Tasks Banner */}
-			<div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-				<h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
-					📊 Analytics Implementation Tasks
-				</h3>
-				<ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
-					<li>• Task 6.6: Optimize performance and implement loading states</li>
-					<li>• Task 8.5: Set up performance monitoring and analytics</li>
-				</ul>
-			</div>
+export default async function AnalyticsPage({
+	searchParams,
+}: {
+	searchParams: Promise<{
+		team?: string | string[];
+		activityPage?: string | string[];
+	}>;
+}) {
+	const user = await requireCurrentUser();
+	const params = await searchParams;
+	const requestedScope = Array.isArray(params.team)
+		? params.team[0]
+		: params.team;
+	const requestedActivityPage = Array.isArray(params.activityPage)
+		? params.activityPage[0]
+		: params.activityPage;
+	const activityPage = Math.max(
+		1,
+		Number.parseInt(requestedActivityPage ?? "1", 10) || 1,
+	);
+	const scopeOptions = await getAnalyticsScopeOptions(user.id);
+	const selectedTeam = scopeOptions.teams.find(
+		(team) => team.id === requestedScope,
+	);
+	const selectedScope = selectedTeam
+		? selectedTeam.id
+		: requestedScope === "standalone" && scopeOptions.hasStandaloneProjects
+			? "standalone"
+			: "all";
+	const scope =
+		selectedScope === "standalone"
+			? { standalone: true }
+			: selectedTeam
+				? { teamId: selectedTeam.id }
+				: {};
+	const scopeLabel =
+		selectedScope === "standalone"
+			? "standalone projects"
+			: selectedTeam
+				? selectedTeam.name
+				: "all your accessible work";
+	const { metrics, recentActivity, activityPagination } =
+		await getAnalyticsData(user.id, scope, activityPage);
+	const metricCards = [
+		{
+			label: "Team Efficiency",
+			value: `${metrics.completionRate}%`,
+			detail: "Completion Rate",
+		},
+		{
+			label: "Project Velocity",
+			value: metrics.projectVelocity,
+			detail: "Tasks per week",
+		},
+		{
+			label: "Active Users",
+			value: metrics.activeUsersThisWeek,
+			detail: "This week",
+		},
+		{
+			label: "Average Task Time",
+			value: metrics.averageTaskTime,
+			detail: "Days",
+		},
+	];
+	const activities: TeamActivityItem[] = recentActivity.map(
+		({ activity, projectName, teamName, actor }) => ({
+			id: activity.id,
+			actorName: actor ? actorName(actor) : "Former member",
+			action:
+				ACTIVITY_LABELS[activity.action as ActivityAction] ?? activity.action,
+			taskTitle:
+				typeof activity.metadata.title === "string"
+					? activity.metadata.title
+					: undefined,
+			projectId: activity.projectId,
+			projectName,
+			teamName: teamName ?? "Standalone project",
+			date: activity.createdAt.toLocaleDateString("en-US", {
+				month: "2-digit",
+				day: "2-digit",
+				year: "numeric",
+			}),
+		}),
+	);
 
-			{/* Analytics Cards */}
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-				{[
-					{
-						title: "Project Velocity",
-						value: "8.5",
-						unit: "tasks/week",
-						icon: TrendingUp,
-						color: "blue",
-					},
-					{
-						title: "Team Efficiency",
-						value: "92%",
-						unit: "completion rate",
-						icon: BarChart3,
-						color: "green",
-					},
-					{
-						title: "Active Users",
-						value: "24",
-						unit: "this week",
-						icon: Users,
-						color: "purple",
-					},
-					{
-						title: "Avg. Task Time",
-						value: "2.3",
-						unit: "days",
-						icon: Clock,
-						color: "orange",
-					},
-				].map((metric) => (
-					<div
-						key={metric.title}
-						className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6"
-					>
-						<div className="flex items-center justify-between mb-4">
-							<div
-								className={`w-10 h-10 bg-${metric.color}-100 dark:bg-${metric.color}-900 rounded-lg flex items-center justify-center`}
-							>
-								<metric.icon className={`text-${metric.color}-500`} size={20} />
-							</div>
-						</div>
-						<div className="text-2xl font-bold text-outer_space-500 dark:text-platinum-500 mb-1">
-							{metric.value}
-						</div>
-						<div className="text-sm text-paynes_gray-500 dark:text-french_gray-400 mb-2">
-							{metric.unit}
-						</div>
-						<div className="text-xs font-medium text-outer_space-500 dark:text-platinum-500">
-							{metric.title}
-						</div>
-					</div>
+	return (
+		<div className="space-y-5">
+			<header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+				<div>
+					<h1 className="font-display text-3xl font-extrabold tracking-[-0.03em] text-foreground sm:text-4xl ">
+						Analytics
+					</h1>
+					<p className="mt-1 text-sm text-muted-foreground ">
+						Live project and task insights for {scopeLabel}
+					</p>
+				</div>
+				<AnalyticsScopeFilter
+					value={selectedScope}
+					teams={scopeOptions.teams}
+					hasStandaloneProjects={scopeOptions.hasStandaloneProjects}
+				/>
+			</header>
+
+			<div className="grid grid-cols-2 gap-3 lg:grid-cols-4 sm:gap-4">
+				{metricCards.map((metric) => (
+					<MetricCard key={metric.label} {...metric} />
 				))}
 			</div>
 
-			{/* Charts Placeholder */}
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				<div className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6">
-					<h3 className="text-lg font-semibold text-outer_space-500 dark:text-platinum-500 mb-4">
-						Project Progress
-					</h3>
-					<div className="h-64 bg-platinum-800 dark:bg-outer_space-400 rounded-lg flex items-center justify-center">
-						<div className="text-center text-paynes_gray-500 dark:text-french_gray-400">
-							<BarChart3 size={48} className="mx-auto mb-2" />
-							<p>Chart Component Placeholder</p>
-							<p className="text-sm">
-								TODO: Implement with Chart.js or Recharts
-							</p>
-						</div>
-					</div>
-				</div>
-
-				<div className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6">
-					<h3 className="text-lg font-semibold text-outer_space-500 dark:text-platinum-500 mb-4">
-						Team Activity
-					</h3>
-					<div className="h-64 bg-platinum-800 dark:bg-outer_space-400 rounded-lg flex items-center justify-center">
-						<div className="text-center text-paynes_gray-500 dark:text-french_gray-400">
-							<TrendingUp size={48} className="mx-auto mb-2" />
-							<p>Activity Chart Placeholder</p>
-							<p className="text-sm">TODO: Implement activity timeline</p>
-						</div>
-					</div>
-				</div>
+			<div className="grid gap-5 lg:grid-cols-2">
+				<ProjectProgressCard
+					completionRate={metrics.completionRate}
+					completedTasks={metrics.completedTasks}
+					totalTasks={metrics.totalTasks}
+				/>
+				<TeamActivityCard
+					activities={activities}
+					page={activityPagination.page}
+					totalPages={activityPagination.totalPages}
+					selectedScope={selectedScope}
+					showTeam={selectedScope === "all"}
+				/>
 			</div>
 		</div>
 	);

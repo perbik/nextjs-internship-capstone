@@ -4,7 +4,7 @@ import {
 	canAccessProject,
 	getProjectMembership,
 } from "@/lib/db/queries/project-members";
-import { lists, projects, tasks } from "@/lib/db/schema";
+import { labels, lists, projects, tasks } from "@/lib/db/schema";
 import type { TaskFilters } from "@/lib/validations";
 
 export async function getProjectBoard(
@@ -22,9 +22,11 @@ export async function getProjectBoard(
 		filters.priority ? eq(tasks.priority, filters.priority) : undefined,
 		filters.assignee === "unassigned"
 			? isNull(tasks.assigneeId)
-			: filters.assignee
-				? eq(tasks.assigneeId, filters.assignee)
-				: undefined,
+			: filters.assignee === "me"
+				? eq(tasks.assigneeId, userId)
+				: filters.assignee
+					? eq(tasks.assigneeId, filters.assignee)
+					: undefined,
 		search
 			? or(ilike(tasks.title, search), ilike(tasks.description, search))
 			: undefined,
@@ -37,13 +39,21 @@ export async function getProjectBoard(
 				members: {
 					with: { user: true },
 				},
+				labels: {
+					orderBy: asc(labels.name),
+				},
 				lists: {
 					orderBy: asc(lists.position),
 					with: {
 						tasks: {
 							where: and(...taskConditions),
 							orderBy: asc(tasks.position),
-							with: { assignee: true },
+							with: {
+								assignee: true,
+								taskLabels: {
+									with: { label: true },
+								},
+							},
 						},
 					},
 				},

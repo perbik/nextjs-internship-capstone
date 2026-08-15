@@ -37,10 +37,12 @@ import {
 	updateListAction,
 } from "@/app/(dashboard)/projects/[id]/list-actions";
 import { saveBoardLayoutAction } from "@/app/(dashboard)/projects/[id]/task-actions";
+import { BulkTaskToolbar } from "@/components/bulk-task-toolbar";
 import {
 	CreateTaskModal,
 	type TaskMemberOption,
 } from "@/components/modals/create-task-modal";
+import type { TaskLabelOption } from "@/components/project-labels";
 import { TaskCard } from "@/components/task-card";
 import {
 	type BoardList,
@@ -52,6 +54,7 @@ interface KanbanBoardProps {
 	projectId: string;
 	lists: BoardList[];
 	members: TaskMemberOption[];
+	labels: TaskLabelOption[];
 	canManage: boolean;
 	dragEnabled: boolean;
 }
@@ -93,6 +96,7 @@ export function KanbanBoard({
 	projectId,
 	lists,
 	members,
+	labels,
 	canManage,
 	dragEnabled,
 }: KanbanBoardProps) {
@@ -114,6 +118,7 @@ export function KanbanBoard({
 		confirmSnapshot,
 		rejectSnapshot,
 		clearMoveError,
+		bulkMode,
 	} = useBoardStore();
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const saveInFlight = useRef(false);
@@ -295,6 +300,12 @@ export function KanbanBoard({
 			onDragCancel={handleDragCancel}
 		>
 			<div className="overflow-hidden rounded-lg border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+				<BulkTaskToolbar
+					projectId={projectId}
+					lists={boardLists}
+					members={members}
+					labels={labels}
+				/>
 				{!dragEnabled && (
 					<p className="mb-4 rounded-lg bg-yellow-50 px-3 py-2 text-sm text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200">
 						Clear task filters to drag and reorder tasks.
@@ -321,7 +332,8 @@ export function KanbanBoard({
 							list={list}
 							lists={boardLists}
 							members={members}
-							dragDisabled={!dragEnabled}
+							labels={labels}
+							dragDisabled={!dragEnabled || bulkMode}
 							canManage={canManage}
 							canMoveLeft={index > 0}
 							canMoveRight={index < boardLists.length - 1}
@@ -396,6 +408,7 @@ function ListColumn({
 	list,
 	lists,
 	members,
+	labels,
 	dragDisabled,
 	canManage,
 	canMoveLeft,
@@ -405,6 +418,7 @@ function ListColumn({
 	list: BoardList;
 	lists: BoardList[];
 	members: TaskMemberOption[];
+	labels: TaskLabelOption[];
 	dragDisabled: boolean;
 	canManage: boolean;
 	canMoveLeft: boolean;
@@ -426,6 +440,11 @@ function ListColumn({
 			index: list.tasks.length,
 		},
 	});
+	const bulkMode = useBoardStore((state) => state.bulkMode);
+	const selectedTaskIds = useBoardStore((state) => state.selectedTaskIds);
+	const toggleTaskSelection = useBoardStore(
+		(state) => state.toggleTaskSelection,
+	);
 
 	return (
 		<section className="w-80 shrink-0 overflow-hidden rounded-lg border border-french_gray-300 bg-platinum-800 dark:border-paynes_gray-400 dark:bg-outer_space-400">
@@ -553,6 +572,10 @@ function ListColumn({
 								task={task}
 								lists={lists}
 								members={members}
+								labels={labels}
+								bulkMode={bulkMode}
+								selected={selectedTaskIds.includes(task.id)}
+								onToggleSelection={() => toggleTaskSelection(task.id)}
 							/>
 						))
 					) : (
@@ -565,6 +588,7 @@ function ListColumn({
 					projectId={projectId}
 					lists={lists}
 					members={members}
+					labels={labels}
 					initialListId={list.id}
 				/>
 			</div>

@@ -1,11 +1,19 @@
 import { ArrowLeft, RotateCcw, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AssignProjectTeamForm } from "@/components/assign-project-team-form";
 import { DebouncedSearchInput } from "@/components/debounced-search-input";
 import { KanbanBoard } from "@/components/kanban-board";
 import { ProjectActions } from "@/components/project-actions";
+import { ProjectCollaborators } from "@/components/project-collaborators";
+import { ProjectLabels } from "@/components/project-labels";
+import { ProjectMembersManager } from "@/components/project-members-manager";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { getProjectBoard } from "@/lib/db/queries";
+import {
+	getEligibleTeamMembersForProject,
+	getManageableTeamsForUser,
+	getProjectBoard,
+} from "@/lib/db/queries";
 import { taskFilterSchema } from "@/lib/validations";
 
 function firstValue(value: string | string[] | undefined) {
@@ -42,16 +50,53 @@ export default async function ProjectPage({
 	const canManage =
 		membership?.role === "owner" || membership?.role === "admin";
 	const canDelete = project.ownerId === user.id;
-	const members = project.members.map(({ user: member }) => ({
+	const manageableTeams =
+		canDelete && !project.teamId
+			? await getManageableTeamsForUser(user.id)
+			: [];
+	const members = project.members.map(({ user: member, role }) => ({
 		id: member.id,
 		name:
 			[member.firstName, member.lastName].filter(Boolean).join(" ") ||
 			member.email,
+		email: member.email,
+		role,
+		isCurrentUser: member.id === user.id,
 	}));
+	const eligibleTeamMembers = canManage
+		? await getEligibleTeamMembersForProject(project.id, user.id)
+		: [];
+	const projectMemberIds = new Set(members.map(({ id }) => id));
+	const availableTeamMembers = eligibleTeamMembers
+		.filter(({ user: eligibleUser }) => !projectMemberIds.has(eligibleUser.id))
+		.map(({ user: eligibleUser }) => ({
+			id: eligibleUser.id,
+			name:
+				[eligibleUser.firstName, eligibleUser.lastName]
+					.filter(Boolean)
+					.join(" ") || eligibleUser.email,
+			email: eligibleUser.email,
+		}));
 	const matchingTaskCount = project.lists.reduce(
 		(total, list) => total + list.tasks.length,
 		0,
 	);
+	const labels = project.labels.map((label) => ({
+		id: label.id,
+		name: label.name,
+		color: label.color,
+	}));
+	const boardLists = project.lists.map((list) => ({
+		...list,
+		tasks: list.tasks.map((task) => ({
+			...task,
+			labels: task.taskLabels.map(({ label }) => ({
+				id: label.id,
+				name: label.name,
+				color: label.color,
+			})),
+		})),
+	}));
 
 	return (
 		<div className="space-y-6">
@@ -87,6 +132,24 @@ export default async function ProjectPage({
 				/>
 			</div>
 
+			<ProjectCollaborators members={members} />
+			{canDelete && !project.teamId && (
+				<AssignProjectTeamForm projectId={project.id} teams={manageableTeams} />
+			)}
+			{(membership?.role === "owner" || membership?.role === "admin") && (
+				<ProjectMembersManager
+					projectId={project.id}
+					members={members}
+					actorRole={membership.role}
+					eligibleMembers={availableTeamMembers}
+				/>
+			)}
+			<ProjectLabels
+				projectId={project.id}
+				labels={labels}
+				canManage={canManage}
+			/>
+
 			<form
 				action={`/projects/${project.id}`}
 				className="grid gap-3 rounded-xl border border-french_gray-300 bg-white p-4 md:grid-cols-[minmax(14rem,1fr)_10rem_13rem_auto] dark:border-paynes_gray-400 dark:bg-outer_space-500"
@@ -120,10 +183,12 @@ export default async function ProjectPage({
 						className="w-full rounded-lg border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-400 dark:text-platinum-500"
 					>
 						<option value="">All assignees</option>
+						<option value="me">Assigned to me</option>
 						<option value="unassigned">Unassigned</option>
 						{members.map((member) => (
 							<option key={member.id} value={member.id}>
 								{member.name}
+								{member.isCurrentUser ? " (You)" : ""}
 							</option>
 						))}
 					</select>
@@ -158,8 +223,9 @@ export default async function ProjectPage({
 
 			<KanbanBoard
 				projectId={project.id}
-				lists={project.lists}
+				lists={boardLists}
 				members={members}
+				labels={labels}
 				canManage={canManage}
 				dragEnabled={!hasFilters}
 			/>

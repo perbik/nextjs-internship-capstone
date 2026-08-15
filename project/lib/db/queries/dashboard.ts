@@ -1,7 +1,11 @@
+import { getTeamOverview } from "@/lib/db/queries/project-members";
 import { getProjectSummariesForUser } from "@/lib/db/queries/projects";
 
 export async function getDashboardData(userId: string) {
-	const projects = await getProjectSummariesForUser(userId);
+	const [projects, team] = await Promise.all([
+		getProjectSummariesForUser(userId),
+		getTeamOverview(userId),
+	]);
 	const totalTasks = projects.reduce(
 		(total, project) => total + project.taskCount,
 		0,
@@ -13,14 +17,12 @@ export async function getDashboardData(userId: string) {
 
 	return {
 		stats: {
+			pendingTasks: Math.max(totalTasks - completedTasks, 0),
+			teamMembers: new Set(team.map(({ user }) => user.id)).size,
+			completedTasks,
 			activeProjects: projects.filter(
 				({ project }) => project.status === "active",
 			).length,
-			completedProjects: projects.filter(
-				({ project }) => project.status === "completed",
-			).length,
-			totalTasks,
-			completedTasks,
 		},
 		recentProjects: projects.slice(0, 3),
 	};

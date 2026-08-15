@@ -3,9 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { createTask, saveBoardLayout, updateTask } from "@/lib/db/mutations";
+import {
+	bulkUpdateTasks,
+	createTask,
+	saveBoardLayout,
+	updateTask,
+} from "@/lib/db/mutations";
 import {
 	boardLayoutSchema,
+	bulkTaskOperationSchema,
 	taskCreateSchema,
 	taskUpdateSchema,
 } from "@/lib/validations";
@@ -29,6 +35,9 @@ function taskFormData(formData: FormData) {
 		priority: formValue(formData, "priority"),
 		dueDate: formValue(formData, "dueDate"),
 		assigneeId: formValue(formData, "assigneeId"),
+		labelIds: formData
+			.getAll("labelIds")
+			.filter((value): value is string => typeof value === "string"),
 	};
 }
 
@@ -54,6 +63,7 @@ function normalizeTaskData(data: z.output<typeof taskCreateSchema>) {
 		priority: data.priority,
 		dueDate: data.dueDate ?? null,
 		assigneeId: data.assigneeId ?? null,
+		labelIds: data.labelIds,
 	};
 }
 
@@ -86,6 +96,7 @@ export async function createTaskAction(
 	revalidatePath(`/projects/${projectId.data}`);
 	revalidatePath("/projects");
 	revalidatePath("/dashboard");
+	revalidatePath("/calendar");
 	return { message: "Task created", success: true };
 }
 
@@ -132,6 +143,7 @@ export async function updateTaskAction(
 	revalidatePath(`/projects/${projectId.data}`);
 	revalidatePath("/projects");
 	revalidatePath("/dashboard");
+	revalidatePath("/calendar");
 	return { message: "Task updated", success: true };
 }
 
@@ -155,4 +167,40 @@ export async function saveBoardLayoutAction(
 	}
 
 	return { message: "Board saved", success: true };
+}
+
+export async function bulkUpdateTasksAction(
+	input: unknown,
+): Promise<TaskActionState> {
+	const parsed = bulkTaskOperationSchema.safeParse(input);
+
+	if (!parsed.success) {
+		return {
+			message:
+				parsed.error.flatten().formErrors[0] ??
+				"Select valid tasks and a bulk action",
+		};
+	}
+
+	try {
+		const user = await requireCurrentUser();
+		await bulkUpdateTasks(user.id, parsed.data);
+	} catch (error) {
+		return {
+			message:
+				error instanceof Error
+					? error.message
+					: "Unable to update the selected tasks",
+		};
+	}
+
+	revalidatePath(`/projects/${parsed.data.projectId}`);
+	revalidatePath("/projects");
+	revalidatePath("/dashboard");
+	return {
+		message: `${parsed.data.taskIds.length} ${
+			parsed.data.taskIds.length === 1 ? "task" : "tasks"
+		} updated`,
+		success: true,
+	};
 }

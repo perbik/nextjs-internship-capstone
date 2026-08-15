@@ -1,13 +1,8 @@
-import {
-	CheckCircle,
-	ClipboardCheck,
-	FolderKanban,
-	ListTodo,
-} from "lucide-react";
+import { CheckCircle, FolderKanban, ListTodo, Users } from "lucide-react";
 import Link from "next/link";
 import { CreateProjectModal } from "@/components/modals/create-project-modal";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { getDashboardData } from "@/lib/db/queries";
+import { getDashboardData, getManageableTeamsForUser } from "@/lib/db/queries";
 
 const projectStatusLabels = {
 	active: "Active",
@@ -26,7 +21,10 @@ const projectStatusClasses = {
 
 export default async function DashboardPage() {
 	const user = await requireCurrentUser();
-	const { stats, recentProjects } = await getDashboardData(user.id);
+	const [{ stats, recentProjects }, manageableTeams] = await Promise.all([
+		getDashboardData(user.id),
+		getManageableTeamsForUser(user.id),
+	]);
 	const statCards = [
 		{
 			name: "Active Projects",
@@ -34,15 +32,19 @@ export default async function DashboardPage() {
 			icon: FolderKanban,
 		},
 		{
-			name: "Completed Projects",
-			value: stats.completedProjects,
-			icon: CheckCircle,
+			name: "Team Members",
+			value: stats.teamMembers,
+			icon: Users,
 		},
-		{ name: "Total Tasks", value: stats.totalTasks, icon: ListTodo },
 		{
 			name: "Completed Tasks",
 			value: stats.completedTasks,
-			icon: ClipboardCheck,
+			icon: CheckCircle,
+		},
+		{
+			name: "Pending Tasks",
+			value: stats.pendingTasks,
+			icon: ListTodo,
 		},
 	];
 
@@ -162,7 +164,7 @@ export default async function DashboardPage() {
 						Start a new workspace or continue managing your existing projects.
 					</p>
 					<div className="flex flex-col items-start gap-3">
-						<CreateProjectModal />
+						<CreateProjectModal teams={manageableTeams} />
 						<Link
 							href="/projects"
 							className="rounded-lg border border-french_gray-300 px-4 py-2 text-sm font-medium text-outer_space-500 transition-colors hover:bg-platinum-500 dark:border-paynes_gray-400 dark:text-platinum-500 dark:hover:bg-paynes_gray-400"

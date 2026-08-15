@@ -57,7 +57,9 @@ export const projectSchema = z.object({
 	dueDate: futureOptionalDate("Due date"),
 });
 
-export const projectCreateSchema = projectSchema;
+export const projectCreateSchema = projectSchema.extend({
+	teamId: z.uuid("Select a team for this project"),
+});
 
 export const projectUpdateSchema = projectSchema
 	.extend({
@@ -77,6 +79,10 @@ export const taskSchema = z.object({
 	}),
 	dueDate: optionalDate("Due date"),
 	assigneeId: optionalUuid("Assignee"),
+	labelIds: z
+		.array(z.uuid("Label must be a valid ID"))
+		.max(10, "A task can have at most 10 labels")
+		.default([]),
 });
 
 export const taskCreateSchema = taskSchema.extend({
@@ -100,6 +106,45 @@ export const boardLayoutSchema = z.object({
 		.min(1, "The board must contain at least one list"),
 });
 
+const bulkTaskBase = {
+	projectId: z.uuid("Project must be a valid ID"),
+	taskIds: z
+		.array(z.uuid("Task must be a valid ID"))
+		.min(1, "Select at least one task")
+		.max(100, "You can update at most 100 tasks at once"),
+};
+
+export const bulkTaskOperationSchema = z.discriminatedUnion("operation", [
+	z.object({
+		...bulkTaskBase,
+		operation: z.literal("move"),
+		value: z.uuid("Column must be a valid ID"),
+	}),
+	z.object({
+		...bulkTaskBase,
+		operation: z.literal("assign"),
+		value: z.union([
+			z.uuid("Assignee must be a valid ID"),
+			z.literal("unassigned"),
+		]),
+	}),
+	z.object({
+		...bulkTaskBase,
+		operation: z.literal("priority"),
+		value: z.enum(TASK_PRIORITIES),
+	}),
+	z.object({
+		...bulkTaskBase,
+		operation: z.literal("add_label"),
+		value: z.uuid("Label must be a valid ID"),
+	}),
+	z.object({
+		...bulkTaskBase,
+		operation: z.literal("remove_label"),
+		value: z.uuid("Label must be a valid ID"),
+	}),
+]);
+
 export const projectFilterSchema = z.object({
 	q: optionalText("Search", 100),
 	status: z.preprocess(
@@ -121,7 +166,11 @@ export const taskFilterSchema = z.object({
 	assignee: z.preprocess(
 		(value) => (value === "" ? undefined : value),
 		z
-			.union([z.uuid("Assignee must be a valid ID"), z.literal("unassigned")])
+			.union([
+				z.uuid("Assignee must be a valid ID"),
+				z.literal("me"),
+				z.literal("unassigned"),
+			])
 			.optional(),
 	),
 });
@@ -149,6 +198,63 @@ export const listUpdateSchema = listSchema
 	.partial()
 	.refine(hasUpdate, { message: "At least one list field is required" });
 
+export const labelSchema = z.object({
+	name: requiredText("Label name", 50),
+	color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Choose a valid label color"),
+});
+
+export const labelCreateSchema = labelSchema.extend({
+	projectId: z.uuid("Project must be a valid ID"),
+});
+
+export const projectMemberCreateSchema = z.object({
+	projectId: z.uuid("Project must be a valid ID"),
+	email: z.email("Enter a valid member email").trim().toLowerCase(),
+	role: z.enum(["admin", "member"], {
+		error: "Role must be admin or member",
+	}),
+});
+
+export const projectMemberUpdateSchema = z.object({
+	projectId: z.uuid("Project must be a valid ID"),
+	userId: z.uuid("Member must be a valid ID"),
+	role: z.enum(["admin", "member"], {
+		error: "Role must be admin or member",
+	}),
+});
+
+export const projectMemberRemoveSchema = z.object({
+	projectId: z.uuid("Project must be a valid ID"),
+	userId: z.uuid("Member must be a valid ID"),
+});
+
+export const projectTeamAssignSchema = z.object({
+	projectId: z.uuid("Project must be a valid ID"),
+	teamId: z.uuid("Select a valid team"),
+});
+
+export const teamCreateSchema = z.object({
+	name: requiredText("Team name", 100),
+	description: optionalText("Description", 500),
+});
+
+export const teamMemberCreateSchema = z.object({
+	teamId: z.uuid("Team must be a valid ID"),
+	email: z.email("Enter a valid member email").trim().toLowerCase(),
+	role: z.enum(["admin", "member"]),
+});
+
+export const teamMemberUpdateSchema = z.object({
+	teamId: z.uuid("Team must be a valid ID"),
+	userId: z.uuid("Member must be a valid ID"),
+	role: z.enum(["admin", "member"]),
+});
+
+export const teamMemberRemoveSchema = z.object({
+	teamId: z.uuid("Team must be a valid ID"),
+	userId: z.uuid("Member must be a valid ID"),
+});
+
 export const commentSchema = z.object({
 	content: requiredText("Comment", 1000),
 });
@@ -163,10 +269,13 @@ export const commentUpdateSchema = commentSchema.partial().refine(hasUpdate, {
 
 export type ProjectInput = z.input<typeof projectSchema>;
 export type ProjectData = z.output<typeof projectSchema>;
+export type ProjectCreateData = z.output<typeof projectCreateSchema>;
 export type TaskInput = z.input<typeof taskSchema>;
 export type TaskData = z.output<typeof taskSchema>;
 export type ProjectFilters = z.output<typeof projectFilterSchema>;
 export type TaskFilters = z.output<typeof taskFilterSchema>;
+export type BulkTaskOperation = z.output<typeof bulkTaskOperationSchema>;
 export type UserProfileInput = z.input<typeof userProfileSchema>;
 export type ListInput = z.input<typeof listSchema>;
+export type LabelInput = z.input<typeof labelSchema>;
 export type CommentInput = z.input<typeof commentSchema>;

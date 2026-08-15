@@ -1,6 +1,6 @@
-import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { projectMembers, projects, users } from "@/lib/db/schema";
+import { projectMembers, projects, teamMembers, users } from "@/lib/db/schema";
 
 export async function canAccessProject(projectId: string, userId: string) {
 	const [project] = await db
@@ -64,5 +64,60 @@ export async function getProjectMembers(
 		.innerJoin(users, eq(projectMembers.userId, users.id))
 		.where(
 			and(eq(projectMembers.projectId, projectId), isNull(users.deletedAt)),
+		);
+}
+
+export async function getTeamOverview(userId: string) {
+	const accessibleProjects = await db
+		.select({ id: projects.id })
+		.from(projectMembers)
+		.innerJoin(projects, eq(projectMembers.projectId, projects.id))
+		.where(and(eq(projectMembers.userId, userId), isNull(projects.deletedAt)));
+
+	if (accessibleProjects.length === 0) {
+		return [];
+	}
+
+	return db
+		.select({
+			projectId: projects.id,
+			projectName: projects.name,
+			role: projectMembers.role,
+			user: users,
+		})
+		.from(projectMembers)
+		.innerJoin(projects, eq(projectMembers.projectId, projects.id))
+		.innerJoin(users, eq(projectMembers.userId, users.id))
+		.where(
+			and(
+				inArray(
+					projects.id,
+					accessibleProjects.map(({ id }) => id),
+				),
+				isNull(users.deletedAt),
+			),
+		);
+}
+
+export async function getEligibleTeamMembersForProject(
+	projectId: string,
+	requestingUserId: string,
+) {
+	if (!(await canManageProject(projectId, requestingUserId))) return [];
+
+	const [project] = await db
+		.select({ teamId: projects.teamId })
+		.from(projects)
+		.where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
+		.limit(1);
+
+	if (!project?.teamId) return [];
+
+	return db
+		.select({ membership: teamMembers, user: users })
+		.from(teamMembers)
+		.innerJoin(users, eq(teamMembers.userId, users.id))
+		.where(
+			and(eq(teamMembers.teamId, project.teamId), isNull(users.deletedAt)),
 		);
 }

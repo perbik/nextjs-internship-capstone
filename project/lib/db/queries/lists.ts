@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { canAccessProject } from "@/lib/db/queries/project-members";
 import { lists } from "@/lib/db/schema";
 
+// Get the ordered lists in an accessible project
 export async function getListsByProject(projectId: string, userId: string) {
 	if (!(await canAccessProject(projectId, userId))) {
 		return [];
@@ -15,6 +16,7 @@ export async function getListsByProject(projectId: string, userId: string) {
 		.orderBy(asc(lists.position));
 }
 
+// Get one list when the user can access its project
 export async function getListById(listId: string, userId: string) {
 	const [list] = await db
 		.select()

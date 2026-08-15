@@ -2,6 +2,7 @@ import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { projectMembers, projects, teamMembers, users } from "@/lib/db/schema";
 
+// Check whether a user owns or belongs to an active project
 export async function canAccessProject(projectId: string, userId: string) {
 	const [project] = await db
 		.select({ id: projects.id })
@@ -25,6 +26,7 @@ export async function canAccessProject(projectId: string, userId: string) {
 	return Boolean(project);
 }
 
+// Get a user's role in a project
 export async function getProjectMembership(projectId: string, userId: string) {
 	const [membership] = await db
 		.select()
@@ -40,6 +42,7 @@ export async function getProjectMembership(projectId: string, userId: string) {
 	return membership ?? null;
 }
 
+// Check whether a user is a project owner or admin
 export async function canManageProject(projectId: string, userId: string) {
 	if (!(await canAccessProject(projectId, userId))) {
 		return false;
@@ -50,6 +53,7 @@ export async function canManageProject(projectId: string, userId: string) {
 	return membership?.role === "owner" || membership?.role === "admin";
 }
 
+// Get the active members of an accessible project
 export async function getProjectMembers(
 	projectId: string,
 	requestingUserId: string,
@@ -67,6 +71,7 @@ export async function getProjectMembers(
 		);
 }
 
+// Get members across all projects the user can access
 export async function getTeamOverview(userId: string) {
 	const accessibleProjects = await db
 		.select({ id: projects.id })
@@ -99,6 +104,7 @@ export async function getTeamOverview(userId: string) {
 		);
 }
 
+// Get active team members who can be added to a project
 export async function getEligibleTeamMembersForProject(
 	projectId: string,
 	requestingUserId: string,

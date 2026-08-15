@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 
+// Client-side task containing the joined data required by task cards
 export interface BoardTask {
 	id: string;
 	listId: string;
@@ -22,6 +23,7 @@ export interface BoardTask {
 	}>;
 }
 
+// Kanban column and its currently visible tasks
 export interface BoardList {
 	id: string;
 	name: string;
@@ -30,6 +32,7 @@ export interface BoardList {
 	tasks: BoardTask[];
 }
 
+// Locally queued task movement waiting for server confirmation - Optimistic
 export interface BoardMove {
 	id: string;
 	taskId: string;
@@ -39,26 +42,38 @@ export interface BoardMove {
 }
 
 interface BoardState {
+	// Board identity and optimistic persistence state
 	projectId: string | null;
 	lists: BoardList[];
+	// Last server-confirmed snapshot used as the rollback baseline
 	confirmedLists: BoardList[];
 	isDragging: boolean;
 	pendingMoves: BoardMove[];
 	moveError: string;
+
+	// Bulk-selection state shared by the board columns and toolbar
 	bulkMode: boolean;
 	selectedTaskIds: string[];
+
+	// Server synchronization and drag lifecycle actions
 	syncBoard: (projectId: string, lists: BoardList[]) => void;
 	startDragging: () => void;
 	stopDragging: () => void;
 	cancelDragging: () => void;
+
+	// Optimistic task and column movement actions
 	previewMove: (move: Omit<BoardMove, "id">) => void;
 	queueMove: (move: BoardMove) => void;
 	reorderLists: (sourceListId: string, targetListId: string) => void;
 	confirmListOrder: () => void;
 	revertListOrder: () => void;
+
+	// Sync the local snapshot after the server save either succeeds or fails
 	confirmSnapshot: (moveIds: string[], savedLists: BoardList[]) => void;
 	rejectSnapshot: (moveIds: string[], error: string) => void;
 	clearMoveError: () => void;
+
+	// Bulk selection and optimistic task removal actions
 	setBulkMode: (enabled: boolean) => void;
 	toggleTaskSelection: (taskId: string) => void;
 	selectTasks: (taskIds: string[]) => void;
@@ -66,6 +81,7 @@ interface BoardState {
 	removeTask: (taskId: string) => void;
 }
 
+// Pure immutable move helper used for previews, final drops, and replaying moves
 export function moveTaskBetweenLists(
 	currentLists: BoardList[],
 	move: Omit<BoardMove, "id">,
@@ -108,6 +124,7 @@ export function moveTaskBetweenLists(
 	});
 }
 
+// Reapplies newer unsaved moves on top of a confirmed server snapshot
 function replayMoves(lists: BoardList[], moves: BoardMove[]) {
 	return moves.reduce(
 		(currentLists, move) => moveTaskBetweenLists(currentLists, move),
@@ -115,6 +132,7 @@ function replayMoves(lists: BoardList[], moves: BoardMove[]) {
 	);
 }
 
+// Shared client store for optimistic board state and bulk task selection
 export const useBoardStore = create<BoardState>()((set) => ({
 	projectId: null,
 	lists: [],
@@ -125,6 +143,7 @@ export const useBoardStore = create<BoardState>()((set) => ({
 	bulkMode: false,
 	selectedTaskIds: [],
 
+	// Avoid replacing an active optimistic board with stale server-rendered props
 	syncBoard: (projectId, lists) =>
 		set((state) => {
 			if (
@@ -155,6 +174,7 @@ export const useBoardStore = create<BoardState>()((set) => ({
 
 	startDragging: () => set({ isDragging: true }),
 	stopDragging: () => set({ isDragging: false }),
+	// Remove the temporary preview while retaining moves already queued for saving
 	cancelDragging: () =>
 		set((state) => ({
 			isDragging: false,
@@ -198,6 +218,7 @@ export const useBoardStore = create<BoardState>()((set) => ({
 
 	revertListOrder: () => set((state) => ({ lists: state.confirmedLists })),
 
+	// Confirm captured moves without discarding newer moves made during the request
 	confirmSnapshot: (moveIds, savedLists) =>
 		set((state) => {
 			const confirmedIds = new Set(moveIds);
@@ -212,6 +233,7 @@ export const useBoardStore = create<BoardState>()((set) => ({
 			};
 		}),
 
+	// Roll back rejected moves and preserve any unrelated moves still pending
 	rejectSnapshot: (moveIds, error) =>
 		set((state) => {
 			const rejectedIds = new Set(moveIds);

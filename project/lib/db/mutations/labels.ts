@@ -8,6 +8,7 @@ interface CreateLabelData {
 	color: string;
 }
 
+// Create a unique label when the user can manage the project
 export async function createLabel(
 	projectId: string,
 	userId: string,
@@ -35,6 +36,7 @@ export async function createLabel(
 	return label;
 }
 
+// Delete a label when the user can manage its project
 export async function deleteLabel(labelId: string, userId: string) {
 	const [label] = await db
 		.select()
@@ -47,5 +49,5 @@ export async function deleteLabel(labelId: string, userId: string) {
 	}
 
 	await db.delete(labels).where(eq(labels.id, labelId));
-	return label;
+	return { label, projectId: label.projectId };
 }

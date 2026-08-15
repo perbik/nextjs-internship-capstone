@@ -15,6 +15,7 @@ export function parseCalendarDate(value: string | undefined) {
 			return parsed;
 		}
 	}
+
 	const now = new Date();
 	return new Date(
 		Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
@@ -31,6 +32,7 @@ export function startOfWeek(date: Date) {
 	return addUtcDays(date, -date.getUTCDay());
 }
 
+// End dates are exclusive so they can be used directly in database queries
 export function calendarRange(view: CalendarView, anchor: Date) {
 	if (view === "day") return { start: anchor, end: addUtcDays(anchor, 1) };
 	if (view === "week") {

@@ -14,11 +14,14 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 
+// Shared database values
 export const projectStatus = pgEnum("project_status", [
 	"active",
 	"completed",
 	"on_hold",
 ]);
+
+export type ProjectStatus = (typeof projectStatus.enumValues)[number];
 
 export const projectMemberRole = pgEnum("project_member_role", [
 	"owner",
@@ -34,6 +37,7 @@ export const teamMemberRole = pgEnum("team_member_role", [
 
 export const taskPriority = pgEnum("task_priority", ["low", "medium", "high"]);
 
+// User and project tables
 export const users = pgTable("users", {
 	id: uuid("id").defaultRandom().primaryKey(),
 	clerkId: text("clerk_id").notNull().unique(),
@@ -79,6 +83,7 @@ export const projects = pgTable(
 	],
 );
 
+// Team and membership tables
 export const teams = pgTable(
 	"teams",
 	{
@@ -142,6 +147,7 @@ export const projectMembers = pgTable(
 	],
 );
 
+// Kanban board tables
 export const lists = pgTable(
 	"lists",
 	{
@@ -234,6 +240,7 @@ export const taskLabels = pgTable(
 	],
 );
 
+// Comments and activity history
 export const comments = pgTable(
 	"comments",
 	{
@@ -288,6 +295,7 @@ export const activityLogs = pgTable(
 	],
 );
 
+// One user to many projects, teams, memberships, tasks, comments, and activities
 export const usersRelations = relations(users, ({ many }) => ({
 	ownedProjects: many(projects),
 	projectMemberships: many(projectMembers),
@@ -298,6 +306,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 	activities: many(activityLogs),
 }));
 
+// Many projects to one owner and team; one project to many members, lists, labels, and activities
 export const projectsRelations = relations(projects, ({ one, many }) => ({
 	owner: one(users, {
 		fields: [projects.ownerId],
@@ -313,6 +322,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
 	activities: many(activityLogs),
 }));
 
+// Many teams to one owner; one team to many members and projects
 export const teamsRelations = relations(teams, ({ one, many }) => ({
 	owner: one(users, {
 		fields: [teams.ownerId],
@@ -322,6 +332,7 @@ export const teamsRelations = relations(teams, ({ one, many }) => ({
 	projects: many(projects),
 }));
 
+// Many team memberships to one team and one user
 export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
 	team: one(teams, {
 		fields: [teamMembers.teamId],
@@ -333,6 +344,7 @@ export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
 	}),
 }));
 
+// Many project memberships to one project and one user
 export const projectMembersRelations = relations(projectMembers, ({ one }) => ({
 	project: one(projects, {
 		fields: [projectMembers.projectId],
@@ -344,6 +356,7 @@ export const projectMembersRelations = relations(projectMembers, ({ one }) => ({
 	}),
 }));
 
+// Many lists to one project; one list to many tasks
 export const listsRelations = relations(lists, ({ one, many }) => ({
 	project: one(projects, {
 		fields: [lists.projectId],
@@ -352,6 +365,7 @@ export const listsRelations = relations(lists, ({ one, many }) => ({
 	tasks: many(tasks),
 }));
 
+// Many labels to one project; tasks and labels are many-to-many through task labels
 export const labelsRelations = relations(labels, ({ one, many }) => ({
 	project: one(projects, {
 		fields: [labels.projectId],
@@ -360,6 +374,7 @@ export const labelsRelations = relations(labels, ({ one, many }) => ({
 	taskLabels: many(taskLabels),
 }));
 
+// Many tasks to one list and assignee; one task to many comments, labels, and activities
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
 	list: one(lists, {
 		fields: [tasks.listId],
@@ -374,6 +389,7 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
 	activities: many(activityLogs),
 }));
 
+// Many task-label records to one task and one label
 export const taskLabelsRelations = relations(taskLabels, ({ one }) => ({
 	task: one(tasks, {
 		fields: [taskLabels.taskId],
@@ -385,6 +401,7 @@ export const taskLabelsRelations = relations(taskLabels, ({ one }) => ({
 	}),
 }));
 
+// Many comments to one task and one author
 export const commentsRelations = relations(comments, ({ one }) => ({
 	task: one(tasks, {
 		fields: [comments.taskId],
@@ -396,6 +413,7 @@ export const commentsRelations = relations(comments, ({ one }) => ({
 	}),
 }));
 
+// Many activities to one project, task, and actor
 export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
 	project: one(projects, {
 		fields: [activityLogs.projectId],

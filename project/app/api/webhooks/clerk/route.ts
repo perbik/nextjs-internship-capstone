@@ -5,9 +5,11 @@ import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 
+// Keep only webhook payloads that contain a complete Clerk user
 type ClerkUser = Extract<WebhookEvent["data"], { email_addresses: unknown }>;
 
 function getPrimaryEmail(user: ClerkUser) {
+	// The first email is not always the user's selected primary email
 	const primaryEmail = user.email_addresses.find(
 		(email) => email.id === user.primary_email_address_id,
 	);
@@ -31,6 +33,7 @@ async function upsertUser(user: ClerkUser) {
 		deletedAt: null,
 	};
 
+	// Replayed create events update the existing Clerk user instead of duplicating it
 	await db
 		.insert(users)
 		.values(values)
@@ -51,6 +54,7 @@ export async function POST(request: NextRequest) {
 	let event: WebhookEvent;
 
 	try {
+		// Verify the request before trusting its event data
 		event = await verifyWebhook(request);
 	} catch {
 		return new Response("Invalid webhook signature", { status: 400 });
@@ -64,6 +68,7 @@ export async function POST(request: NextRequest) {
 				break;
 			case "user.deleted":
 				if (event.data.id) {
+					// Preserve related projects, tasks, comments, and activity history
 					await db
 						.update(users)
 						.set({

@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
 	lists,
@@ -6,11 +6,13 @@ import {
 	projects,
 	tasks,
 	teamMembers,
-	users,
 } from "@/lib/db/schema";
+import { withTransaction } from "@/lib/db/transaction";
 
+// Roles that can be assigned other than owner
 type ManageableRole = "admin" | "member";
 
+// Require the current user to be a project owner or admin
 async function requireManagementContext(projectId: string, actorId: string) {
 	const [context] = await db
 		.select({
@@ -39,26 +41,17 @@ async function requireManagementContext(projectId: string, actorId: string) {
 	return context;
 }
 
+// Add a registered team member as a project collaborator
 export async function addProjectMember(
 	projectId: string,
 	actorId: string,
-	email: string,
+	userId: string,
 	role: ManageableRole,
 ) {
 	const context = await requireManagementContext(projectId, actorId);
 
 	if (context.actorRole === "admin" && role !== "member") {
 		throw new Error("Only the project owner can add administrators");
-	}
-
-	const [user] = await db
-		.select({ id: users.id })
-		.from(users)
-		.where(and(ilike(users.email, email), isNull(users.deletedAt)))
-		.limit(1);
-
-	if (!user) {
-		throw new Error("No registered ProjectFlow user was found with that email");
 	}
 
 	if (!context.teamId) {
@@ -72,7 +65,7 @@ export async function addProjectMember(
 		.where(
 			and(
 				eq(teamMembers.teamId, context.teamId),
-				eq(teamMembers.userId, user.id),
+				eq(teamMembers.userId, userId),
 			),
 		)
 		.limit(1);
@@ -88,7 +81,7 @@ export async function addProjectMember(
 		.where(
 			and(
 				eq(projectMembers.projectId, projectId),
-				eq(projectMembers.userId, user.id),
+				eq(projectMembers.userId, userId),
 			),
 		)
 		.limit(1);
@@ -97,15 +90,16 @@ export async function addProjectMember(
 		throw new Error("This user is already a project member");
 	}
 
-	await db.insert(projectMembers).values({ projectId, userId: user.id, role });
+	await db.insert(projectMembers).values({ projectId, userId, role });
 	await db
 		.update(projects)
 		.set({ updatedAt: new Date() })
 		.where(eq(projects.id, projectId));
 
-	return user.id;
+	return userId;
 }
 
+// Change a project member's role as the project owner
 export async function updateProjectMemberRole(
 	projectId: string,
 	actorId: string,
@@ -140,6 +134,7 @@ export async function updateProjectMemberRole(
 	return membership;
 }
 
+// Remove a collaborator and unassign their project tasks
 export async function removeProjectMember(
 	projectId: string,
 	actorId: string,
@@ -170,40 +165,49 @@ export async function removeProjectMember(
 		throw new Error("Administrators can only remove regular members");
 	}
 
-	const projectTaskIds = await db
-		.select({ id: tasks.id })
-		.from(tasks)
-		.innerJoin(lists, eq(tasks.listId, lists.id))
-		.where(
-			and(
-				eq(lists.projectId, projectId),
-				eq(tasks.assigneeId, userId),
-				isNull(tasks.deletedAt),
-			),
-		);
-
-	if (projectTaskIds.length > 0) {
-		await db
-			.update(tasks)
-			.set({ assigneeId: null, updatedAt: new Date() })
+	await withTransaction(async (tx) => {
+		const now = new Date();
+		const projectTaskIds = await tx
+			.select({ id: tasks.id })
+			.from(tasks)
+			.innerJoin(lists, eq(tasks.listId, lists.id))
 			.where(
-				inArray(
-					tasks.id,
-					projectTaskIds.map(({ id }) => id),
+				and(
+					eq(lists.projectId, projectId),
+					eq(tasks.assigneeId, userId),
+					isNull(tasks.deletedAt),
 				),
 			);
-	}
 
-	await db
-		.delete(projectMembers)
-		.where(
-			and(
-				eq(projectMembers.projectId, projectId),
-				eq(projectMembers.userId, userId),
-			),
-		);
-	await db
-		.update(projects)
-		.set({ updatedAt: new Date() })
-		.where(eq(projects.id, projectId));
+		if (projectTaskIds.length > 0) {
+			await tx
+				.update(tasks)
+				.set({ assigneeId: null, updatedAt: now })
+				.where(
+					inArray(
+						tasks.id,
+						projectTaskIds.map(({ id }) => id),
+					),
+				);
+		}
+
+		const [removedMembership] = await tx
+			.delete(projectMembers)
+			.where(
+				and(
+					eq(projectMembers.projectId, projectId),
+					eq(projectMembers.userId, userId),
+				),
+			)
+			.returning({ userId: projectMembers.userId });
+
+		if (!removedMembership) {
+			throw new Error("Project member not found");
+		}
+
+		await tx
+			.update(projects)
+			.set({ updatedAt: now })
+			.where(eq(projects.id, projectId));
+	});
 }

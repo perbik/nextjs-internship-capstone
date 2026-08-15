@@ -1,7 +1,8 @@
-import { and, asc, eq, gt, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { canManageProject } from "@/lib/db/queries/project-members";
-import { lists, projects } from "@/lib/db/schema";
+import { lists, projects, tasks } from "@/lib/db/schema";
+import { withTransaction } from "@/lib/db/transaction";
 
 interface CreateListData {
 	name: string;
@@ -13,6 +14,7 @@ interface UpdateListData {
 	isCompleted: boolean;
 }
 
+// Load a list and require project management permission
 async function requireManageableList(listId: string, userId: string) {
 	const [list] = await db
 		.select()
@@ -27,6 +29,7 @@ async function requireManageableList(listId: string, userId: string) {
 	return list;
 }
 
+// Mark the project as recently updated
 async function touchProject(projectId: string) {
 	await db
 		.update(projects)
@@ -34,6 +37,33 @@ async function touchProject(projectId: string) {
 		.where(eq(projects.id, projectId));
 }
 
+// Keep at least one column that counts tasks as completed
+async function requireCompletedList(
+	projectId: string,
+	excludedListId?: string,
+) {
+	const conditions = [
+		eq(lists.projectId, projectId),
+		eq(lists.isCompleted, true),
+	];
+
+	if (excludedListId) {
+		conditions.push(sql`${lists.id} <> ${excludedListId}`);
+	}
+
+	const [{ completedListCount }] = await db
+		.select({
+			completedListCount: sql<number>`count(*)::int`.mapWith(Number),
+		})
+		.from(lists)
+		.where(and(...conditions));
+
+	if (completedListCount < 1) {
+		throw new Error("A project must keep at least one completed column");
+	}
+}
+
+// Add a list at the end of a project board
 export async function createList(
 	projectId: string,
 	userId: string,
@@ -41,6 +71,9 @@ export async function createList(
 ) {
 	if (!(await canManageProject(projectId, userId))) {
 		throw new Error("You do not have permission to add lists to this project");
+	}
+	if (!data.isCompleted) {
+		await requireCompletedList(projectId);
 	}
 
 	const [positionResult] = await db
@@ -64,12 +97,16 @@ export async function createList(
 	return list;
 }
 
+// Rename a list or change whether it completes tasks
 export async function updateList(
 	listId: string,
 	userId: string,
 	data: UpdateListData,
 ) {
 	const currentList = await requireManageableList(listId, userId);
+	if (!data.isCompleted) {
+		await requireCompletedList(currentList.projectId, currentList.id);
+	}
 	const [list] = await db
 		.update(lists)
 		.set({ ...data, updatedAt: new Date() })
@@ -77,36 +114,73 @@ export async function updateList(
 		.returning();
 
 	await touchProject(currentList.projectId);
-	return list;
+	return { list, projectId: currentList.projectId };
 }
 
+// Delete a list while keeping at least one project column
 export async function deleteList(listId: string, userId: string) {
 	const list = await requireManageableList(listId, userId);
-	const [{ listCount }] = await db
-		.select({ listCount: sql<number>`count(*)::int`.mapWith(Number) })
-		.from(lists)
-		.where(eq(lists.projectId, list.projectId));
 
-	if (listCount <= 1) {
-		throw new Error("A project must keep at least one list");
-	}
+	await withTransaction(async (tx) => {
+		const [{ listCount }] = await tx
+			.select({ listCount: sql<number>`count(*)::int`.mapWith(Number) })
+			.from(lists)
+			.where(eq(lists.projectId, list.projectId));
+		const [{ completedListCount }] = await tx
+			.select({
+				completedListCount: sql<number>`count(*)::int`.mapWith(Number),
+			})
+			.from(lists)
+			.where(
+				and(
+					eq(lists.projectId, list.projectId),
+					eq(lists.isCompleted, true),
+					sql`${lists.id} <> ${list.id}`,
+				),
+			);
+		const [{ taskCount }] = await tx
+			.select({ taskCount: sql<number>`count(*)::int`.mapWith(Number) })
+			.from(tasks)
+			.where(and(eq(tasks.listId, listId), isNull(tasks.deletedAt)));
 
-	await db.delete(lists).where(eq(lists.id, listId));
-	await db
-		.update(lists)
-		.set({
-			position: sql`${lists.position} - 1`,
-			updatedAt: new Date(),
-		})
-		.where(
-			and(
-				eq(lists.projectId, list.projectId),
-				gt(lists.position, list.position),
-			),
-		);
-	await touchProject(list.projectId);
+		if (listCount <= 1) {
+			throw new Error("A project must keep at least one list");
+		}
+
+		if (completedListCount < 1) {
+			throw new Error("A project must keep at least one completed column");
+		}
+
+		if (taskCount > 0) {
+			throw new Error(
+				"Move or delete the tasks in this column before deleting it",
+			);
+		}
+
+		const updatedAt = new Date();
+		await tx.delete(lists).where(eq(lists.id, listId));
+		await tx
+			.update(lists)
+			.set({
+				position: sql`${lists.position} - 1`,
+				updatedAt,
+			})
+			.where(
+				and(
+					eq(lists.projectId, list.projectId),
+					gt(lists.position, list.position),
+				),
+			);
+		await tx
+			.update(projects)
+			.set({ updatedAt })
+			.where(eq(projects.id, list.projectId));
+	});
+
+	return { projectId: list.projectId };
 }
 
+// Swap a list with the column beside it
 export async function moveList(
 	listId: string,
 	userId: string,
@@ -124,7 +198,7 @@ export async function moveList(
 	const target = projectLists[targetIndex];
 
 	if (currentIndex < 0 || !target) {
-		return;
+		return { projectId: list.projectId };
 	}
 
 	await db.batch([
@@ -141,4 +215,52 @@ export async function moveList(
 			.set({ updatedAt: new Date() })
 			.where(eq(projects.id, list.projectId)),
 	]);
+
+	return { projectId: list.projectId };
+}
+
+// Save a dragged column at its final position in one transaction
+export async function moveListToPosition(
+	listId: string,
+	userId: string,
+	targetPosition: number,
+) {
+	const list = await requireManageableList(listId, userId);
+
+	await withTransaction(async (tx) => {
+		const projectLists = await tx
+			.select()
+			.from(lists)
+			.where(eq(lists.projectId, list.projectId))
+			.orderBy(asc(lists.position));
+		const currentIndex = projectLists.findIndex((item) => item.id === listId);
+
+		if (currentIndex < 0) {
+			throw new Error("The column no longer exists");
+		}
+
+		const finalPosition = Math.min(targetPosition, projectLists.length - 1);
+		if (currentIndex === finalPosition) return;
+
+		const reorderedLists = [...projectLists];
+		const [movedList] = reorderedLists.splice(currentIndex, 1);
+		reorderedLists.splice(finalPosition, 0, movedList);
+		const updatedAt = new Date();
+
+		for (const [position, projectList] of reorderedLists.entries()) {
+			if (projectList.position === position) continue;
+
+			await tx
+				.update(lists)
+				.set({ position, updatedAt })
+				.where(eq(lists.id, projectList.id));
+		}
+
+		await tx
+			.update(projects)
+			.set({ updatedAt })
+			.where(eq(projects.id, list.projectId));
+	});
+
+	return { projectId: list.projectId };
 }

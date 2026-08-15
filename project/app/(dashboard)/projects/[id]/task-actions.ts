@@ -3,8 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { createTask, updateTask } from "@/lib/db/mutations";
-import { taskCreateSchema, taskUpdateSchema } from "@/lib/validations";
+import { createTask, saveBoardLayout, updateTask } from "@/lib/db/mutations";
+import {
+	boardLayoutSchema,
+	taskCreateSchema,
+	taskUpdateSchema,
+} from "@/lib/validations";
 
 export interface TaskActionState {
 	message: string;
@@ -129,4 +133,26 @@ export async function updateTaskAction(
 	revalidatePath("/projects");
 	revalidatePath("/dashboard");
 	return { message: "Task updated", success: true };
+}
+
+export async function saveBoardLayoutAction(
+	input: unknown,
+): Promise<TaskActionState> {
+	const parsed = boardLayoutSchema.safeParse(input);
+
+	if (!parsed.success) {
+		return { message: "Invalid board layout" };
+	}
+
+	try {
+		const user = await requireCurrentUser();
+		await saveBoardLayout(parsed.data.projectId, user.id, parsed.data.lists);
+	} catch (error) {
+		return {
+			message:
+				error instanceof Error ? error.message : "Unable to save the board",
+		};
+	}
+
+	return { message: "Board saved", success: true };
 }

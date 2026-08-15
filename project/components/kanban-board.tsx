@@ -1,6 +1,25 @@
 "use client";
 
 import {
+	closestCorners,
+	DndContext,
+	type DragCancelEvent,
+	type DragEndEvent,
+	type DragOverEvent,
+	DragOverlay,
+	type DragStartEvent,
+	KeyboardSensor,
+	PointerSensor,
+	useDroppable,
+	useSensor,
+	useSensors,
+} from "@dnd-kit/core";
+import {
+	SortableContext,
+	sortableKeyboardCoordinates,
+	verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import {
 	ArrowLeft,
 	ArrowRight,
 	CheckCircle,
@@ -8,7 +27,7 @@ import {
 	Plus,
 	Trash2,
 } from "lucide-react";
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
 	createListAction,
@@ -17,123 +36,358 @@ import {
 	moveListAction,
 	updateListAction,
 } from "@/app/(dashboard)/projects/[id]/list-actions";
+import { saveBoardLayoutAction } from "@/app/(dashboard)/projects/[id]/task-actions";
 import {
 	CreateTaskModal,
 	type TaskMemberOption,
 } from "@/components/modals/create-task-modal";
 import { TaskCard } from "@/components/task-card";
-
-interface BoardTask {
-	id: string;
-	listId: string;
-	title: string;
-	description: string | null;
-	priority: "low" | "medium" | "high";
-	dueDate: Date | null;
-	assigneeId: string | null;
-	assignee: {
-		firstName: string | null;
-		lastName: string | null;
-		email: string;
-	} | null;
-}
-
-interface BoardList {
-	id: string;
-	name: string;
-	position: number;
-	isCompleted: boolean;
-	tasks: BoardTask[];
-}
+import {
+	type BoardList,
+	type BoardMove,
+	useBoardStore,
+} from "@/stores/board-store";
 
 interface KanbanBoardProps {
 	projectId: string;
 	lists: BoardList[];
 	members: TaskMemberOption[];
 	canManage: boolean;
+	dragEnabled: boolean;
 }
 
 const initialState: ListActionState = { message: "" };
+
+function findTaskLocation(lists: BoardList[], taskId: string) {
+	for (const list of lists) {
+		const position = list.tasks.findIndex((task) => task.id === taskId);
+
+		if (position >= 0) {
+			return {
+				listId: list.id,
+				position,
+				task: list.tasks[position],
+			};
+		}
+	}
+
+	return null;
+}
+
+function getDropLocation(data: Record<string, unknown> | undefined) {
+	if (
+		(data?.kind !== "task" && data?.kind !== "column") ||
+		typeof data.listId !== "string" ||
+		typeof data.index !== "number"
+	) {
+		return null;
+	}
+
+	return {
+		listId: data.listId,
+		position: data.index,
+	};
+}
 
 export function KanbanBoard({
 	projectId,
 	lists,
 	members,
 	canManage,
+	dragEnabled,
 }: KanbanBoardProps) {
 	const [createState, createAction, isCreating] = useActionState(
 		createListAction,
 		initialState,
 	);
+	const {
+		projectId: storedProjectId,
+		lists: storedLists,
+		pendingMoves,
+		moveError,
+		syncBoard,
+		startDragging,
+		stopDragging,
+		cancelDragging,
+		previewMove,
+		queueMove,
+		confirmSnapshot,
+		rejectSnapshot,
+		clearMoveError,
+	} = useBoardStore();
+	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const saveInFlight = useRef(false);
+	const dragOrigin = useRef<{
+		taskId: string;
+		listId: string;
+		position: number;
+	} | null>(null);
+	const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+	const sensors = useSensors(
+		useSensor(PointerSensor, {
+			activationConstraint: { distance: 4 },
+		}),
+		useSensor(KeyboardSensor, {
+			coordinateGetter: sortableKeyboardCoordinates,
+		}),
+	);
+	const boardLists = storedProjectId === projectId ? storedLists : lists;
+	const isMoving = pendingMoves.length > 0;
+
+	useEffect(() => {
+		syncBoard(projectId, lists);
+	}, [lists, projectId, syncBoard]);
+
+	function handleDragStart(event: DragStartEvent) {
+		const location = findTaskLocation(boardLists, String(event.active.id));
+
+		if (!location) {
+			return;
+		}
+
+		dragOrigin.current = {
+			taskId: String(event.active.id),
+			listId: location.listId,
+			position: location.position,
+		};
+		setActiveTaskId(String(event.active.id));
+		startDragging();
+		clearMoveError();
+	}
+
+	function handleDragOver(event: DragOverEvent) {
+		const origin = dragOrigin.current;
+
+		if (!origin || !event.over) {
+			return;
+		}
+
+		const current = findTaskLocation(boardLists, origin.taskId);
+		const target = getDropLocation(event.over.data.current);
+
+		if (
+			!current ||
+			!target ||
+			(current.listId === target.listId && current.position === target.position)
+		) {
+			return;
+		}
+
+		previewMove({
+			taskId: origin.taskId,
+			sourceListId: current.listId,
+			targetListId: target.listId,
+			targetPosition: target.position,
+		});
+	}
+
+	function handleDragCancel(_event: DragCancelEvent) {
+		dragOrigin.current = null;
+		setActiveTaskId(null);
+		cancelDragging();
+	}
+
+	function handleDragEnd(event: DragEndEvent) {
+		const origin = dragOrigin.current;
+		const finalLocation = event.over
+			? getDropLocation(event.over.data.current)
+			: null;
+
+		dragOrigin.current = null;
+		setActiveTaskId(null);
+		stopDragging();
+
+		if (!origin || !finalLocation || !dragEnabled) {
+			cancelDragging();
+			return;
+		}
+
+		if (
+			origin.listId === finalLocation.listId &&
+			origin.position === finalLocation.position
+		) {
+			cancelDragging();
+			return;
+		}
+
+		const move: BoardMove = {
+			id: crypto.randomUUID(),
+			taskId: origin.taskId,
+			sourceListId: origin.listId,
+			targetListId: finalLocation.listId,
+			targetPosition: finalLocation.position,
+		};
+
+		queueMove(move);
+		scheduleSave();
+	}
+
+	function scheduleSave(delay = 250) {
+		if (saveTimer.current) {
+			clearTimeout(saveTimer.current);
+		}
+
+		saveTimer.current = setTimeout(() => {
+			saveTimer.current = null;
+			void persistBoardSnapshot();
+		}, delay);
+	}
+
+	async function persistBoardSnapshot() {
+		if (saveInFlight.current) {
+			return;
+		}
+
+		const state = useBoardStore.getState();
+		const capturedMoves = [...state.pendingMoves];
+
+		if (capturedMoves.length === 0) {
+			return;
+		}
+
+		const snapshot = state.lists.map((list) => ({
+			...list,
+			tasks: [...list.tasks],
+		}));
+		saveInFlight.current = true;
+
+		try {
+			const result = await saveBoardLayoutAction({
+				projectId,
+				lists: snapshot.map((list) => ({
+					id: list.id,
+					taskIds: list.tasks.map((task) => task.id),
+				})),
+			});
+
+			if (result.success) {
+				confirmSnapshot(
+					capturedMoves.map((move) => move.id),
+					snapshot,
+				);
+			} else {
+				rejectSnapshot(
+					capturedMoves.map((move) => move.id),
+					result.message,
+				);
+			}
+		} catch {
+			rejectSnapshot(
+				capturedMoves.map((move) => move.id),
+				"Unable to save the task position. Please try again.",
+			);
+		} finally {
+			saveInFlight.current = false;
+
+			if (useBoardStore.getState().pendingMoves.length > 0) {
+				scheduleSave(0);
+			}
+		}
+	}
 
 	return (
-		<div className="overflow-hidden rounded-lg border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
-			<div className="flex gap-5 overflow-x-auto pb-3">
-				{lists.map((list, index) => (
-					<ListColumn
-						key={list.id}
-						projectId={projectId}
-						list={list}
-						lists={lists}
-						members={members}
-						canManage={canManage}
-						canMoveLeft={index > 0}
-						canMoveRight={index < lists.length - 1}
-					/>
-				))}
-
-				{canManage && (
-					<form
-						action={createAction}
-						className="w-80 shrink-0 self-start rounded-lg border border-dashed border-french_gray-300 bg-platinum-800 p-4 dark:border-paynes_gray-400 dark:bg-outer_space-400"
-					>
-						<input type="hidden" name="projectId" value={projectId} />
-						<label
-							htmlFor="new-list-name"
-							className="text-sm font-medium text-outer_space-500 dark:text-platinum-500"
-						>
-							Add a column
-						</label>
-						<input
-							id="new-list-name"
-							name="name"
-							required
-							maxLength={100}
-							placeholder="Column name"
-							className="mt-2 w-full rounded-md border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-500 dark:text-platinum-500"
-						/>
-						<label className="mt-3 flex items-center gap-2 text-sm text-paynes_gray-500 dark:text-french_gray-400">
-							<input
-								type="checkbox"
-								name="isCompleted"
-								className="size-4 accent-blue_munsell-500"
-							/>
-							Tasks here count as completed
-						</label>
-						{createState.message && (
-							<p
-								className={`mt-2 text-xs ${
-									createState.success
-										? "text-green-600 dark:text-green-400"
-										: "text-red-600 dark:text-red-400"
-								}`}
-								role="status"
-							>
-								{createState.message}
-							</p>
-						)}
-						<button
-							type="submit"
-							disabled={isCreating}
-							className="mt-3 inline-flex items-center gap-2 rounded-md bg-blue_munsell-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue_munsell-600 disabled:opacity-60"
-						>
-							<Plus size={16} />
-							{isCreating ? "Adding..." : "Add column"}
-						</button>
-					</form>
+		<DndContext
+			sensors={sensors}
+			collisionDetection={closestCorners}
+			onDragStart={handleDragStart}
+			onDragOver={handleDragOver}
+			onDragEnd={handleDragEnd}
+			onDragCancel={handleDragCancel}
+		>
+			<div className="overflow-hidden rounded-lg border border-french_gray-300 bg-white p-5 dark:border-paynes_gray-400 dark:bg-outer_space-500">
+				{!dragEnabled && (
+					<p className="mb-4 rounded-lg bg-yellow-50 px-3 py-2 text-sm text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200">
+						Clear task filters to drag and reorder tasks.
+					</p>
 				)}
+				{isMoving && (
+					<p className="sr-only" role="status" aria-live="polite">
+						Saving task position...
+					</p>
+				)}
+				{moveError && (
+					<p
+						className="mb-4 text-sm text-red-600 dark:text-red-400"
+						role="alert"
+					>
+						{moveError}
+					</p>
+				)}
+				<div className="flex gap-5 overflow-x-auto pb-3">
+					{boardLists.map((list, index) => (
+						<ListColumn
+							key={list.id}
+							projectId={projectId}
+							list={list}
+							lists={boardLists}
+							members={members}
+							dragDisabled={!dragEnabled}
+							canManage={canManage}
+							canMoveLeft={index > 0}
+							canMoveRight={index < boardLists.length - 1}
+						/>
+					))}
+
+					{canManage && (
+						<form
+							action={createAction}
+							className="w-80 shrink-0 self-start rounded-lg border border-dashed border-french_gray-300 bg-platinum-800 p-4 dark:border-paynes_gray-400 dark:bg-outer_space-400"
+						>
+							<input type="hidden" name="projectId" value={projectId} />
+							<label
+								htmlFor="new-list-name"
+								className="text-sm font-medium text-outer_space-500 dark:text-platinum-500"
+							>
+								Add a column
+							</label>
+							<input
+								id="new-list-name"
+								name="name"
+								required
+								maxLength={100}
+								placeholder="Column name"
+								className="mt-2 w-full rounded-md border border-french_gray-300 bg-white px-3 py-2 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500 dark:border-paynes_gray-400 dark:bg-outer_space-500 dark:text-platinum-500"
+							/>
+							<label className="mt-3 flex items-center gap-2 text-sm text-paynes_gray-500 dark:text-french_gray-400">
+								<input
+									type="checkbox"
+									name="isCompleted"
+									className="size-4 accent-blue_munsell-500"
+								/>
+								Tasks here count as completed
+							</label>
+							{createState.message && (
+								<p
+									className={`mt-2 text-xs ${
+										createState.success
+											? "text-green-600 dark:text-green-400"
+											: "text-red-600 dark:text-red-400"
+									}`}
+									role="status"
+								>
+									{createState.message}
+								</p>
+							)}
+							<button
+								type="submit"
+								disabled={isCreating}
+								className="mt-3 inline-flex items-center gap-2 rounded-md bg-blue_munsell-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue_munsell-600 disabled:opacity-60"
+							>
+								<Plus size={16} />
+								{isCreating ? "Adding..." : "Add column"}
+							</button>
+						</form>
+					)}
+				</div>
 			</div>
-		</div>
+			<DragOverlay dropAnimation={null}>
+				{activeTaskId ? (
+					<div className="w-72 rounded-lg border border-blue_munsell-400 bg-white p-3 text-sm font-medium text-outer_space-500 shadow-xl dark:bg-outer_space-300 dark:text-platinum-500">
+						{findTaskLocation(boardLists, activeTaskId)?.task.title}
+					</div>
+				) : null}
+			</DragOverlay>
+		</DndContext>
 	);
 }
 
@@ -142,6 +396,7 @@ function ListColumn({
 	list,
 	lists,
 	members,
+	dragDisabled,
 	canManage,
 	canMoveLeft,
 	canMoveRight,
@@ -150,6 +405,7 @@ function ListColumn({
 	list: BoardList;
 	lists: BoardList[];
 	members: TaskMemberOption[];
+	dragDisabled: boolean;
 	canManage: boolean;
 	canMoveLeft: boolean;
 	canMoveRight: boolean;
@@ -162,6 +418,14 @@ function ListColumn({
 		deleteListAction,
 		initialState,
 	);
+	const { setNodeRef: dropRef, isOver: isDropTarget } = useDroppable({
+		id: `column-${list.id}`,
+		data: {
+			kind: "column",
+			listId: list.id,
+			index: list.tasks.length,
+		},
+	});
 
 	return (
 		<section className="w-80 shrink-0 overflow-hidden rounded-lg border border-french_gray-300 bg-platinum-800 dark:border-paynes_gray-400 dark:bg-outer_space-400">
@@ -269,22 +533,34 @@ function ListColumn({
 				</div>
 			</header>
 
-			<div className="min-h-80 space-y-3 p-3">
-				{list.tasks.length > 0 ? (
-					list.tasks.map((task) => (
-						<TaskCard
-							key={task.id}
-							projectId={projectId}
-							task={task}
-							lists={lists}
-							members={members}
-						/>
-					))
-				) : (
-					<p className="py-8 text-center text-sm text-paynes_gray-500 dark:text-french_gray-400">
-						No tasks in this column
-					</p>
-				)}
+			<div
+				ref={dropRef}
+				className={`min-h-80 space-y-3 p-3 transition-colors ${
+					isDropTarget ? "bg-blue_munsell-50 dark:bg-blue_munsell-900/20" : ""
+				}`}
+			>
+				<SortableContext
+					items={list.tasks.map((task) => task.id)}
+					strategy={verticalListSortingStrategy}
+				>
+					{list.tasks.length > 0 ? (
+						list.tasks.map((task, index) => (
+							<TaskCard
+								key={task.id}
+								projectId={projectId}
+								index={index}
+								dragDisabled={dragDisabled}
+								task={task}
+								lists={lists}
+								members={members}
+							/>
+						))
+					) : (
+						<p className="py-8 text-center text-sm text-paynes_gray-500 dark:text-french_gray-400">
+							No tasks in this column
+						</p>
+					)}
+				</SortableContext>
 				<CreateTaskModal
 					projectId={projectId}
 					lists={lists}

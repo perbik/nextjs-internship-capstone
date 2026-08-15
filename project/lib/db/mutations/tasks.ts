@@ -1,6 +1,9 @@
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { Pool } from "@neondatabase/serverless";
+import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/neon-serverless";
 import { db } from "@/lib/db";
 import { canAccessProject } from "@/lib/db/queries/project-members";
+import * as schema from "@/lib/db/schema";
 import { lists, projectMembers, projects, tasks } from "@/lib/db/schema";
 
 interface TaskMutationData {
@@ -154,4 +157,93 @@ export async function updateTask(
 
 	await touchProject(currentTask.projectId);
 	return task;
+}
+
+export async function saveBoardLayout(
+	projectId: string,
+	userId: string,
+	layout: Array<{ id: string; taskIds: string[] }>,
+) {
+	if (!(await canAccessProject(projectId, userId))) {
+		throw new Error("You do not have permission to update this board");
+	}
+
+	const databaseUrl = process.env.DATABASE_URL;
+
+	if (!databaseUrl) {
+		throw new Error("DATABASE_URL is required");
+	}
+
+	const pool = new Pool({ connectionString: databaseUrl });
+	const transactionDb = drizzle({ client: pool, schema });
+
+	try {
+		await transactionDb.transaction(async (tx) => {
+			await tx.execute(
+				sql`select pg_advisory_xact_lock(hashtextextended(${projectId}, 0))`,
+			);
+
+			const projectLists = await tx
+				.select({ id: lists.id })
+				.from(lists)
+				.where(eq(lists.projectId, projectId));
+			const validListIds = new Set(projectLists.map(({ id }) => id));
+			const submittedListIds = layout.map(({ id }) => id);
+
+			if (
+				submittedListIds.length !== validListIds.size ||
+				new Set(submittedListIds).size !== submittedListIds.length ||
+				submittedListIds.some((id) => !validListIds.has(id))
+			) {
+				throw new Error(
+					"The board columns have changed. Reload and try again.",
+				);
+			}
+
+			const projectTasks = await tx
+				.select({ id: tasks.id })
+				.from(tasks)
+				.innerJoin(lists, eq(tasks.listId, lists.id))
+				.where(and(eq(lists.projectId, projectId), isNull(tasks.deletedAt)));
+			const validTaskIds = new Set(projectTasks.map(({ id }) => id));
+			const submittedTaskIds = layout.flatMap(({ taskIds }) => taskIds);
+
+			if (
+				submittedTaskIds.length !== validTaskIds.size ||
+				new Set(submittedTaskIds).size !== submittedTaskIds.length ||
+				submittedTaskIds.some((id) => !validTaskIds.has(id))
+			) {
+				throw new Error("The board tasks have changed. Reload and try again.");
+			}
+
+			for (const list of layout) {
+				if (list.taskIds.length === 0) {
+					continue;
+				}
+
+				const positionCases = sql.join(
+					list.taskIds.map(
+						(id, position) => sql`when ${tasks.id} = ${id} then ${position}`,
+					),
+					sql.raw(" "),
+				);
+
+				await tx
+					.update(tasks)
+					.set({
+						listId: list.id,
+						position: sql`case ${positionCases} else ${tasks.position} end`,
+						updatedAt: new Date(),
+					})
+					.where(and(inArray(tasks.id, list.taskIds), isNull(tasks.deletedAt)));
+			}
+
+			await tx
+				.update(projects)
+				.set({ updatedAt: new Date() })
+				.where(eq(projects.id, projectId));
+		});
+	} finally {
+		await pool.end();
+	}
 }

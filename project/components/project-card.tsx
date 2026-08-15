@@ -1,3 +1,5 @@
+"use client";
+
 import {
 	ArrowUpRight,
 	Calendar,
@@ -8,6 +10,7 @@ import {
 import Link from "next/link";
 import { ProjectActions } from "@/components/project-actions";
 import type { ProjectSummary } from "@/lib/db/queries";
+import { useBoardStore } from "@/stores/board-store";
 
 interface ProjectCardProps {
 	summary: ProjectSummary;
@@ -35,7 +38,24 @@ const accentClasses = {
 } as const;
 
 export function ProjectCard({ summary }: ProjectCardProps) {
-	const { project, memberCount, taskCount, completedTaskCount, role } = summary;
+	const {
+		project,
+		memberCount,
+		taskCount: savedTaskCount,
+		completedTaskCount: savedCompletedTaskCount,
+		role,
+	} = summary;
+	const optimisticLists = useBoardStore((state) =>
+		state.projectId === project.id ? state.lists : null,
+	);
+	const taskCount =
+		optimisticLists?.reduce((total, list) => total + list.tasks.length, 0) ??
+		savedTaskCount;
+	const completedTaskCount =
+		optimisticLists?.reduce(
+			(total, list) => total + (list.isCompleted ? list.tasks.length : 0),
+			0,
+		) ?? savedCompletedTaskCount;
 	const progress =
 		taskCount === 0 ? 0 : Math.round((completedTaskCount / taskCount) * 100);
 	const isOverdue =

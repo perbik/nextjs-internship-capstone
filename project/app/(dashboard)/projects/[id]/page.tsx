@@ -161,6 +161,7 @@ export default async function ProjectPage({
 				lists={project.lists}
 				members={members}
 				canManage={canManage}
+				dragEnabled={!hasFilters}
 			/>
 		</div>
 	);

@@ -1,20 +1,12 @@
 import type { TaskLabelOption } from "@/components/project/project-labels";
 import type { TaskMemberOption } from "@/components/task/task-modal-types";
+import type { FormSelectOption } from "@/components/ui/form-select";
+import type { BulkTaskOperation } from "@/lib/validations";
 import type { BoardList } from "@/stores/board-store";
 
-export type BulkOperation =
-	| "move"
-	| "assign"
-	| "priority"
-	| "add_label"
-	| "remove_label";
+export type BulkOperation = BulkTaskOperation["operation"];
 
-export interface BulkSelectOption {
-	value: string;
-	label: string;
-}
-
-export const bulkOperationOptions: BulkSelectOption[] = [
+export const BULK_OPERATION_OPTIONS: FormSelectOption[] = [
 	{ value: "move", label: "Move to" },
 	{ value: "assign", label: "Assign to" },
 	{ value: "priority", label: "Set priority" },
@@ -51,7 +43,7 @@ export function getBulkValueOptions(
 	lists: BoardList[],
 	members: TaskMemberOption[],
 	labels: TaskLabelOption[],
-): BulkSelectOption[] {
+): FormSelectOption[] {
 	switch (operation) {
 		case "move":
 			return lists.map((list) => ({ value: list.id, label: list.name }));
@@ -78,6 +70,7 @@ export function getBulkValueOptions(
 	}
 }
 
+// Remove hidden selections while keeping tasks in their visible board order
 export function orderSelectedTaskIds(
 	allTaskIds: string[],
 	selectedTaskIds: string[],

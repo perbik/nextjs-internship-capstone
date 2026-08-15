@@ -1,9 +1,10 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { ListActionState } from "@/app/(dashboard)/projects/[id]/list-actions";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
 	DialogContent,
@@ -13,8 +14,14 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface CreateListDialogProps {
 	projectId: string;
@@ -30,22 +37,30 @@ export function CreateListDialog({
 	isPending,
 }: CreateListDialogProps) {
 	const [isOpen, setIsOpen] = useState(false);
+	const formId = useId();
 
 	useEffect(() => {
 		if (state.success) setIsOpen(false);
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
-			<DialogTrigger asChild>
-				<button
-					type="button"
-					aria-label="Add column"
-					className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-input bg-card text-foreground transition hover:border-brand hover:text-brand"
-				>
-					<Plus size={18} />
-				</button>
-			</DialogTrigger>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<DialogTrigger asChild>
+						<Button
+							type="button"
+							variant="outline"
+							size="icon"
+							aria-label="Add column"
+							className="size-10 shrink-0 rounded-full bg-card hover:border-brand hover:bg-card hover:text-brand"
+						>
+							<Plus size={18} aria-hidden="true" />
+						</Button>
+					</DialogTrigger>
+				</TooltipTrigger>
+				<TooltipContent>Add column</TooltipContent>
+			</Tooltip>
 
 			<DialogContent className="sm:max-w-md">
 				<DialogHeader>
@@ -57,25 +72,27 @@ export function CreateListDialog({
 				<form action={action} className="space-y-5">
 					<input type="hidden" name="projectId" value={projectId} />
 					<div className="space-y-1.5">
-						<Label htmlFor="new-column-name">Column name</Label>
+						<Label htmlFor={`${formId}-name`}>Column name</Label>
 						<Input
-							id="new-column-name"
+							id={`${formId}-name`}
 							name="name"
 							required
 							maxLength={100}
 							placeholder="e.g. Review"
 						/>
+						<FieldError message={state.errors?.name?.[0]} />
 					</div>
-					<label className="flex items-center gap-2 text-sm text-muted-foreground">
-						<input
-							type="checkbox"
-							name="isCompleted"
-							className="size-4 accent-brand"
-						/>
-						Tasks here count as completed
-					</label>
-					{state.message && !state.success && (
-						<p className="text-sm text-red-600" role="alert">
+					<div className="flex items-center gap-2">
+						<Checkbox id={`${formId}-completed`} name="isCompleted" />
+						<Label
+							htmlFor={`${formId}-completed`}
+							className="text-sm font-normal text-muted-foreground"
+						>
+							Tasks in this column count as completed
+						</Label>
+					</div>
+					{state.message && !state.success && !state.errors?.name && (
+						<p className="text-sm text-destructive" role="alert">
 							{state.message}
 						</p>
 					)}

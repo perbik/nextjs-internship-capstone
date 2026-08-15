@@ -1,6 +1,21 @@
-import type { BoardList } from "@/stores/board-store";
+import type { BoardList, BoardTask } from "@/stores/board-store";
 
-export function findTaskLocation(lists: BoardList[], taskId: string) {
+export interface TaskLocation {
+	listId: string;
+	position: number;
+	task: BoardTask;
+}
+
+export interface DropLocation {
+	listId: string;
+	position: number;
+}
+
+// Find a task's current position in the board
+export function findTaskLocation(
+	lists: BoardList[],
+	taskId: string,
+): TaskLocation | null {
 	for (const list of lists) {
 		const position = list.tasks.findIndex((task) => task.id === taskId);
 
@@ -16,11 +31,16 @@ export function findTaskLocation(lists: BoardList[], taskId: string) {
 	return null;
 }
 
-export function getDropLocation(data: Record<string, unknown> | undefined) {
+// Validate dnd-kit metadata before using it as a drop position
+export function getDropLocation(
+	data: Record<string, unknown> | undefined,
+): DropLocation | null {
 	if (
 		(data?.kind !== "task" && data?.kind !== "column") ||
 		typeof data.listId !== "string" ||
-		typeof data.index !== "number"
+		typeof data.index !== "number" ||
+		!Number.isInteger(data.index) ||
+		data.index < 0
 	) {
 		return null;
 	}

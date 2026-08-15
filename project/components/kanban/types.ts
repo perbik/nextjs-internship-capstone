@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { TaskLabelOption } from "@/components/project/project-labels";
-import type { TaskMemberOption } from "@/components/task/create-task-modal";
+import type { TaskMemberOption } from "@/components/task/task-modal-types";
 import type { BoardList } from "@/stores/board-store";
 
 export interface KanbanBoardProps {
@@ -10,6 +10,7 @@ export interface KanbanBoardProps {
 	labels: TaskLabelOption[];
 	canManage: boolean;
 	dragEnabled: boolean;
+	initialTaskId?: string;
 	filterControl?: ReactNode;
 }
 

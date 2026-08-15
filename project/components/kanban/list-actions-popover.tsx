@@ -9,7 +9,10 @@ import {
 	moveListAction,
 	updateListAction,
 } from "@/app/(dashboard)/projects/[id]/list-actions";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DestructiveActionDialog } from "@/components/ui/destructive-action-dialog";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,9 +20,14 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { BoardList } from "@/stores/board-store";
 
-const initialState: ListActionState = { message: "" };
+const INITIAL_STATE: ListActionState = { message: "" };
 
 interface ListActionsPopoverProps {
 	projectId: string;
@@ -36,28 +44,35 @@ export function ListActionsPopover({
 }: ListActionsPopoverProps) {
 	const [updateState, updateAction, isUpdating] = useActionState(
 		updateListAction,
-		initialState,
+		INITIAL_STATE,
 	);
 	const [deleteState, deleteAction, isDeleting] = useActionState(
 		deleteListAction,
-		initialState,
+		INITIAL_STATE,
 	);
 
 	return (
 		<Popover>
-			<PopoverTrigger asChild>
-				<button
-					type="button"
-					aria-label={`Manage ${list.name}`}
-					className="flex rounded p-1.5 text-paynes_gray-500 hover:bg-french_gray-300 dark:text-french_gray-400 dark:hover:bg-paynes_gray-400"
-				>
-					<MoreHorizontal size={18} />
-				</button>
-			</PopoverTrigger>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<PopoverTrigger asChild>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							aria-label={`Actions for column: ${list.name}`}
+							className="size-7 rounded-md text-muted-foreground hover:bg-brand/5 hover:text-brand"
+						>
+							<MoreHorizontal size={18} aria-hidden="true" />
+						</Button>
+					</PopoverTrigger>
+				</TooltipTrigger>
+				<TooltipContent>Actions for column: {list.name}</TooltipContent>
+			</Tooltip>
 			<PopoverContent
 				align="end"
 				sideOffset={8}
-				className="w-64 rounded-xl border-french_gray-300 bg-card p-4 shadow-xl dark:border-paynes_gray-400 dark:bg-outer_space-500"
+				className="w-64 rounded-xl border-border bg-popover p-4 text-popover-foreground shadow-xl"
 			>
 				<form action={updateAction} className="space-y-3">
 					<input type="hidden" name="listId" value={list.id} />
@@ -71,27 +86,28 @@ export function ListActionsPopover({
 							maxLength={100}
 							defaultValue={list.name}
 						/>
+						<FieldError message={updateState.errors?.name?.[0]} />
 					</div>
-					<label className="flex items-center gap-2 text-xs text-paynes_gray-500 dark:text-french_gray-400">
-						<input
-							type="checkbox"
+					<div className="flex items-center gap-2">
+						<Checkbox
+							id={`list-${list.id}-completed`}
 							name="isCompleted"
 							defaultChecked={list.isCompleted}
-							className="size-4 accent-brand"
 						/>
-						Tasks here count as completed
-					</label>
+						<Label
+							htmlFor={`list-${list.id}-completed`}
+							className="text-xs font-normal text-muted-foreground"
+						>
+							Tasks here count as completed
+						</Label>
+					</div>
 					{updateState.message && <ActionMessage state={updateState} />}
-					<button
-						type="submit"
-						disabled={isUpdating}
-						className="w-full rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
-					>
+					<Button type="submit" disabled={isUpdating} className="w-full">
 						{isUpdating ? "Saving..." : "Save changes"}
-					</button>
+					</Button>
 				</form>
 
-				<div className="my-3 border-t border-border " />
+				<div className="my-3 border-t border-border" />
 				<div className="mb-3 grid grid-cols-2 gap-2">
 					<MoveListButton
 						projectId={projectId}
@@ -119,14 +135,15 @@ export function ListActionsPopover({
 					pendingLabel="Deleting..."
 					error={deleteState.success ? undefined : deleteState.message}
 					trigger={
-						<button
+						<Button
 							type="button"
+							variant="outline"
 							disabled={isDeleting}
-							className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
+							className="w-full border-destructive/30 text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive"
 						>
-							<Trash2 size={15} />
+							<Trash2 size={15} aria-hidden="true" />
 							Delete column
-						</button>
+						</Button>
 					}
 				/>
 			</PopoverContent>
@@ -148,7 +165,7 @@ function MoveListButton({
 	const [state, action] = useActionState(
 		async (_previousState: ListActionState, formData: FormData) =>
 			moveListAction(formData),
-		initialState,
+		INITIAL_STATE,
 	);
 
 	return (
@@ -173,22 +190,24 @@ function MoveSubmitButton({
 	const Icon = direction === "left" ? ArrowLeft : ArrowRight;
 
 	return (
-		<button
+		<Button
 			type="submit"
+			variant="outline"
+			size="sm"
 			disabled={disabled || pending}
-			className="flex w-full items-center justify-center gap-1 rounded-lg border border-input px-2 py-1.5 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-40  "
+			className="w-full gap-1 px-2 text-xs disabled:cursor-not-allowed"
 		>
-			<Icon size={14} />
+			<Icon size={14} aria-hidden="true" />
 			{direction === "left" ? "Move left" : "Move right"}
-		</button>
+		</Button>
 	);
 }
 
 function ActionMessage({ state }: { state: ListActionState }) {
 	return (
 		<p
-			className={`mb-2 text-xs ${state.success ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-			role="status"
+			className={`mb-2 text-xs ${state.success ? "text-success" : "text-destructive"}`}
+			role={state.success ? "status" : "alert"}
 		>
 			{state.message}
 		</p>

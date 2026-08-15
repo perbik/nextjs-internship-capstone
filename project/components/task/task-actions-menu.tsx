@@ -28,17 +28,19 @@ import { useUIStore } from "@/stores/ui-store";
 
 const initialState: TaskActionState = { message: "" };
 
+interface TaskActionsMenuProps {
+	projectId: string;
+	taskId: string;
+	taskTitle: string;
+	onOpenChange?: (open: boolean) => void;
+}
+
 export function TaskActionsMenu({
 	projectId,
 	taskId,
 	taskTitle,
 	onOpenChange,
-}: {
-	projectId: string;
-	taskId: string;
-	taskTitle: string;
-	onOpenChange?: (open: boolean) => void;
-}) {
+}: TaskActionsMenuProps) {
 	const [deleteOpen, setDeleteOpen] = useState(false);
 	const openModal = useUIStore((state) => state.openModal);
 	const removeTask = useBoardStore((state) => state.removeTask);
@@ -58,6 +60,7 @@ export function TaskActionsMenu({
 		<>
 			<DropdownMenu modal={false} onOpenChange={onOpenChange}>
 				<DropdownMenuTrigger asChild>
+					{/* Stop card dragging and editing when the menu trigger is used */}
 					<button
 						type="button"
 						aria-label={`Actions for ${taskTitle}`}
@@ -92,6 +95,7 @@ export function TaskActionsMenu({
 				</DropdownMenuContent>
 			</DropdownMenu>
 
+			{/* Deletion requires confirmation because it changes persisted task data */}
 			<AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
 				<AlertDialogContent>
 					<div className="flex size-11 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400">
@@ -105,6 +109,7 @@ export function TaskActionsMenu({
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<form action={deleteAction} className="space-y-4">
+						{/* The server action verifies project access and the task's project */}
 						<input type="hidden" name="projectId" value={projectId} />
 						<input type="hidden" name="taskId" value={taskId} />
 						{state.message && !state.success && (

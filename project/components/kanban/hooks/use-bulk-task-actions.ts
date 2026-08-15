@@ -51,9 +51,14 @@ export function useBulkTaskActions({
 		() => getBulkValueOptions(operation, lists, members, labels),
 		[labels, lists, members, operation],
 	);
+	// Keep selected tasks in the same order in which they appear on the board
+	const visibleSelectedTaskIds = useMemo(
+		() => orderSelectedTaskIds(allTaskIds, selectedTaskIds),
+		[allTaskIds, selectedTaskIds],
+	);
 	const needsLabel = operationRequiresLabel(operation);
 	const canApply = canApplyBulkOperation({
-		selectedTaskCount: selectedTaskIds.length,
+		selectedTaskCount: visibleSelectedTaskIds.length,
 		value,
 		pendingMoveCount: pendingMoves.length,
 		isPending,
@@ -65,12 +70,14 @@ export function useBulkTaskActions({
 
 	useEffect(() => {
 		function handleShortcut(event: KeyboardEvent) {
+			// Do not run board shortcuts while the user is typing or using a modal
 			if (isTypingTarget(event.target) || activeModalId) {
 				return;
 			}
 
 			if (event.key.toLowerCase() === "b" && !event.ctrlKey && !event.metaKey) {
 				event.preventDefault();
+				if (allTaskIds.length === 0) return;
 				setBulkMode(!bulkMode);
 				setMessage("");
 				return;
@@ -100,6 +107,10 @@ export function useBulkTaskActions({
 		selectTasks(allTaskIds);
 	}
 
+	function enterBulkMode(): void {
+		if (allTaskIds.length > 0) setBulkMode(true);
+	}
+
 	function exitBulkMode(): void {
 		setBulkMode(false);
 		setMessage("");
@@ -112,26 +123,33 @@ export function useBulkTaskActions({
 
 		setIsPending(true);
 		setMessage("");
-		const result = await bulkUpdateTasksAction({
-			projectId,
-			taskIds: orderSelectedTaskIds(allTaskIds, selectedTaskIds),
-			operation,
-			value,
-		});
 
-		setSuccess(Boolean(result.success));
-		setMessage(result.message);
-		setIsPending(false);
+		try {
+			const result = await bulkUpdateTasksAction({
+				projectId,
+				taskIds: visibleSelectedTaskIds,
+				operation,
+				value,
+			});
 
-		if (result.success) {
-			clearTaskSelection();
-			router.refresh();
+			setSuccess(Boolean(result.success));
+			setMessage(result.message);
+
+			if (result.success) {
+				clearTaskSelection();
+				router.refresh();
+			}
+		} catch {
+			setSuccess(false);
+			setMessage("Unable to update the selected tasks. Please try again.");
+		} finally {
+			setIsPending(false);
 		}
 	}
 
 	return {
 		bulkMode,
-		selectedTaskCount: selectedTaskIds.length,
+		selectedTaskCount: visibleSelectedTaskIds.length,
 		allTaskCount: allTaskIds.length,
 		pendingMoveCount: pendingMoves.length,
 		operation,
@@ -144,6 +162,7 @@ export function useBulkTaskActions({
 		canApply,
 		setOperation,
 		setValue,
+		enterBulkMode,
 		selectAll,
 		clearTaskSelection,
 		exitBulkMode,

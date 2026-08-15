@@ -1,4 +1,5 @@
 import type { TaskActivityItem } from "@/components/task/discussion/types";
+import { formatUtcDate } from "@/lib/date-utils";
 
 const activityLabels: Record<string, string> = {
 	task_created: "created the task",
@@ -12,6 +13,7 @@ const activityLabels: Record<string, string> = {
 };
 
 export function activityDescription(activity: TaskActivityItem) {
+	// Translate stored activity metadata into a readable sentence
 	if (
 		activity.action === "task_moved" &&
 		typeof activity.metadata.fromListName === "string" &&
@@ -31,19 +33,20 @@ export function activityDescription(activity: TaskActivityItem) {
 		const to =
 			typeof activity.metadata.to === "string" ? activity.metadata.to : null;
 
+		// Turn stored field changes into readable activity messages
 		switch (activity.metadata.field) {
 			case "title":
-				return `changed the title from “${from}” to “${to}”`;
+				return `changed the title from "${from}" to "${to}"`;
 			case "description":
 				return "updated the description";
 			case "priority":
 				return `changed the priority from ${from} to ${to}`;
 			case "dueDate":
-				if (!from && to)
-					return `set the due date to ${new Date(to).toLocaleDateString()}`;
-				if (from && !to)
-					return `removed the due date (${new Date(from).toLocaleDateString()})`;
-				return `changed the due date from ${new Date(from ?? "").toLocaleDateString()} to ${new Date(to ?? "").toLocaleDateString()}`;
+				if (!from && to) return `set the due date to ${formatUtcDate(to)}`;
+				if (from && !to) return `removed the due date (${formatUtcDate(from)})`;
+				if (from && to)
+					return `changed the due date from ${formatUtcDate(from)} to ${formatUtcDate(to)}`;
+				return "updated the due date";
 			case "assignee":
 				if (!from && to) return `assigned the task to ${to}`;
 				if (from && !to) return `unassigned the task from ${from}`;

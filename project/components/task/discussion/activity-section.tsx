@@ -1,42 +1,45 @@
 import { activityDescription } from "@/components/task/discussion/activity-description";
 import type { TaskActivityItem } from "@/components/task/discussion/types";
 
-export function ActivitySection({
-	activities,
-	limit,
-}: {
+interface ActivitySectionProps {
 	activities: TaskActivityItem[];
 	limit: number;
-}) {
+}
+
+export function ActivitySection({ activities, limit }: ActivitySectionProps) {
 	return (
 		<section>
-			<h3 className="mb-3 text-sm font-semibold text-outer_space-500 dark:text-platinum-500">
-				Activity
-			</h3>
-			<div className="max-h-72 space-y-3 overflow-y-auto">
+			<h3 className="mb-3 text-sm font-semibold text-foreground">Activity</h3>
+			<ol className="max-h-72 space-y-3 overflow-y-auto">
 				{activities.length === 0 && (
-					<p className="text-xs text-paynes_gray-500 dark:text-french_gray-400">
+					<li className="text-xs text-muted-foreground">
 						No recorded activity yet.
-					</p>
+					</li>
 				)}
 				{activities.map((activity) => (
-					<div key={activity.id} className="flex gap-2 text-xs">
-						<span className="mt-1 size-2 shrink-0 rounded-full bg-brand" />
-						<p className="text-paynes_gray-500 dark:text-french_gray-400">
-							<span className="font-medium text-outer_space-500 dark:text-platinum-500">
+					<li key={activity.id} className="flex gap-2 text-xs">
+						<span
+							aria-hidden="true"
+							className="mt-1 size-2 shrink-0 rounded-full bg-brand"
+						/>
+						<p className="text-muted-foreground">
+							<span className="font-medium text-foreground">
 								{activity.actorName}
 							</span>{" "}
 							{activityDescription(activity)}
 							<br />
-							<span className="text-[10px]">
+							<time
+								dateTime={new Date(activity.createdAt).toISOString()}
+								className="text-[10px]"
+							>
 								{new Date(activity.createdAt).toLocaleString()}
-							</span>
+							</time>
 						</p>
-					</div>
+					</li>
 				))}
-			</div>
+			</ol>
 			{activities.length >= limit && (
-				<p className="mt-2 text-[10px] text-paynes_gray-500 dark:text-french_gray-400">
+				<p className="mt-2 text-[10px] text-muted-foreground">
 					Showing the {limit} most recent activity entries.
 				</p>
 			)}

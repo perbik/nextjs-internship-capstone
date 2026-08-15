@@ -11,48 +11,59 @@ import {
 import type { TaskCommentItem } from "@/components/task/discussion/types";
 import { Button } from "@/components/ui/button";
 import { DestructiveActionDialog } from "@/components/ui/destructive-action-dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { FieldError } from "@/components/ui/field-error";
+import { TextareaWithCounter } from "@/components/ui/textarea-with-counter";
 
-const initialState: CommentActionState = { message: "" };
+const INITIAL_COMMENT_STATE: CommentActionState = { message: "" };
 
-export function CommentsSection({
-	projectId,
-	taskId,
-	comments,
-	limit,
-	variant,
-	onRefresh,
-}: {
-	projectId: string;
+interface CommentsSectionProps {
 	taskId: string;
 	comments: TaskCommentItem[];
 	limit: number;
 	variant: "default" | "sidebar";
 	onRefresh: () => void;
-}) {
+}
+
+interface CommentFormProps {
+	taskId: string;
+	comment?: TaskCommentItem;
+	onCancel?: () => void;
+	onSaved: () => void;
+}
+
+interface DeleteCommentFormProps {
+	comment: TaskCommentItem;
+	onDeleted: () => void;
+}
+
+export function CommentsSection({
+	taskId,
+	comments,
+	limit,
+	variant,
+	onRefresh,
+}: CommentsSectionProps) {
+	// Only one comment can show its edit form at a time
 	const [editingId, setEditingId] = useState<string | null>(null);
 
 	return (
 		<section>
-			<h3 className="mb-3 text-sm font-semibold text-outer_space-500 dark:text-platinum-500">
+			<h3 className="mb-3 text-sm font-semibold text-foreground">
 				Comments ({comments.length})
 			</h3>
 			<div
 				className={`${variant === "sidebar" ? "max-h-72" : "max-h-56"} mb-4 space-y-3 overflow-y-auto`}
 			>
 				{comments.length === 0 && (
-					<p className="text-xs text-paynes_gray-500 dark:text-french_gray-400">
-						No comments yet.
-					</p>
+					<p className="text-xs text-muted-foreground">No comments yet.</p>
 				)}
 				{comments.map((comment) => (
 					<article
 						key={comment.id}
-						className="rounded-lg bg-platinum-500/70 p-3 dark:bg-outer_space-400"
+						className="rounded-lg bg-card border border-border p-3"
 					>
 						{editingId === comment.id ? (
 							<CommentForm
-								projectId={projectId}
 								taskId={taskId}
 								comment={comment}
 								onCancel={() => setEditingId(null)}
@@ -62,33 +73,35 @@ export function CommentsSection({
 							<>
 								<div className="flex items-start justify-between gap-2">
 									<div>
-										<p className="text-xs font-medium text-outer_space-500 dark:text-platinum-500">
+										<p className="text-xs font-medium text-foreground">
 											{comment.authorName}
 										</p>
-										<p className="text-[10px] text-paynes_gray-500 dark:text-french_gray-400">
+										<p className="text-[10px] text-muted-foreground">
 											{new Date(comment.createdAt).toLocaleString()}
 											{comment.updatedAt > comment.createdAt ? " · edited" : ""}
 										</p>
 									</div>
+									{/* Only the author can edit or delete this comment */}
 									{comment.isOwn && (
 										<div className="flex gap-1">
-											<button
+											<Button
 												type="button"
+												variant="ghost"
+												size="icon"
 												onClick={() => setEditingId(comment.id)}
 												aria-label="Edit comment"
-												className="rounded p-1 hover:bg-card dark:hover:bg-paynes_gray-400"
+												className="size-7"
 											>
 												<Pencil size={13} />
-											</button>
+											</Button>
 											<DeleteCommentForm
-												projectId={projectId}
 												comment={comment}
 												onDeleted={onRefresh}
 											/>
 										</div>
 									)}
 								</div>
-								<p className="mt-2 whitespace-pre-wrap text-sm text-paynes_gray-600 dark:text-french_gray-300">
+								<p className="mt-2 whitespace-pre-wrap text-sm text-foreground/80">
 									{comment.content}
 								</p>
 							</>
@@ -96,9 +109,10 @@ export function CommentsSection({
 					</article>
 				))}
 			</div>
-			<CommentForm projectId={projectId} taskId={taskId} onSaved={onRefresh} />
+			<CommentForm taskId={taskId} onSaved={onRefresh} />
+			{/* The query intentionally returns only the latest records */}
 			{comments.length >= limit && (
-				<p className="mt-2 text-[10px] text-paynes_gray-500 dark:text-french_gray-400">
+				<p className="mt-2 text-[10px] text-muted-foreground">
 					Showing the {limit} most recent comments.
 				</p>
 			)}
@@ -106,44 +120,28 @@ export function CommentsSection({
 	);
 }
 
-function CommentForm({
-	projectId,
-	taskId,
-	comment,
-	onCancel,
-	onSaved,
-}: {
-	projectId: string;
-	taskId: string;
-	comment?: TaskCommentItem;
-	onCancel?: () => void;
-	onSaved: () => void;
-}) {
+function CommentForm({ taskId, comment, onCancel, onSaved }: CommentFormProps) {
 	const formRef = useRef<HTMLFormElement>(null);
-	const handledSuccess = useRef(false);
 	const [state, action, isPending] = useActionState(
 		comment ? updateCommentAction : createCommentAction,
-		initialState,
+		INITIAL_COMMENT_STATE,
 	);
 
 	useEffect(() => {
-		if (!state.success || handledSuccess.current) {
-			if (!state.success) handledSuccess.current = false;
-			return;
-		}
+		if (!state.success) return;
 
-		handledSuccess.current = true;
+		// Clear the form and reload both comments and activity
 		formRef.current?.reset();
 		onCancel?.();
 		onSaved();
-	}, [onCancel, onSaved, state.success]);
+	}, [onCancel, onSaved, state]);
 
 	return (
 		<form ref={formRef} action={action} className="space-y-2">
-			<input type="hidden" name="projectId" value={projectId} />
+			{/* Server actions use these IDs to find and authorize the records */}
 			<input type="hidden" name="taskId" value={taskId} />
 			{comment && <input type="hidden" name="commentId" value={comment.id} />}
-			<Textarea
+			<TextareaWithCounter
 				name="content"
 				required
 				maxLength={1000}
@@ -152,13 +150,9 @@ function CommentForm({
 				placeholder="Write a comment..."
 				aria-label={comment ? "Edit comment" : "New comment"}
 			/>
-			{state.errors?.content?.[0] && (
-				<p className="text-xs text-red-600 dark:text-red-400">
-					{state.errors.content[0]}
-				</p>
-			)}
+			<FieldError message={state.errors?.content?.[0]} className="text-xs" />
 			{state.message && !state.success && (
-				<p className="text-xs text-red-600 dark:text-red-400" role="alert">
+				<p className="text-xs text-destructive" role="alert">
 					{state.message}
 				</p>
 			)}
@@ -176,52 +170,39 @@ function CommentForm({
 	);
 }
 
-function DeleteCommentForm({
-	projectId,
-	comment,
-	onDeleted,
-}: {
-	projectId: string;
-	comment: TaskCommentItem;
-	onDeleted: () => void;
-}) {
-	const handledSuccess = useRef(false);
+function DeleteCommentForm({ comment, onDeleted }: DeleteCommentFormProps) {
 	const [state, action, isPending] = useActionState(
 		deleteCommentAction,
-		initialState,
+		INITIAL_COMMENT_STATE,
 	);
 
 	useEffect(() => {
-		if (!state.success || handledSuccess.current) {
-			if (!state.success) handledSuccess.current = false;
-			return;
-		}
+		if (!state.success) return;
 
-		handledSuccess.current = true;
+		// Refresh the discussion after the dialog completes the deletion
 		onDeleted();
-	}, [onDeleted, state.success]);
+	}, [onDeleted, state]);
 
 	return (
 		<DestructiveActionDialog
 			title="Delete this comment?"
 			description="This comment will be permanently removed from the task discussion."
 			action={action}
-			fields={[
-				{ name: "projectId", value: projectId },
-				{ name: "commentId", value: comment.id },
-			]}
+			fields={[{ name: "commentId", value: comment.id }]}
 			confirmLabel="Delete comment"
 			pendingLabel="Deleting..."
 			error={state.success ? undefined : state.message}
 			trigger={
-				<button
+				<Button
 					type="button"
+					variant="ghost"
+					size="icon"
 					disabled={isPending}
 					aria-label={`Delete comment by ${comment.authorName}`}
-					className="rounded p-1 text-red-600 hover:bg-card disabled:opacity-50 dark:text-red-400 dark:hover:bg-paynes_gray-400"
+					className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
 				>
 					<Trash2 size={13} />
-				</button>
+				</Button>
 			}
 		/>
 	);

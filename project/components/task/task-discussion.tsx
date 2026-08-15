@@ -2,27 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getTaskDiscussionAction } from "@/app/(dashboard)/projects/[id]/comment-actions";
+import { TaskDiscussionSkeleton } from "@/components/loading";
 import { ActivitySection } from "@/components/task/discussion/activity-section";
 import { CommentsSection } from "@/components/task/discussion/comments-section";
 import type {
 	TaskActivityItem,
 	TaskCommentItem,
 } from "@/components/task/discussion/types";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 export type {
 	TaskActivityItem,
 	TaskCommentItem,
 } from "@/components/task/discussion/types";
 
-const discussionSkeletonSections = ["comments", "activity"];
-
 export function TaskDiscussion({
-	projectId,
 	taskId,
 	variant = "default",
 }: {
-	projectId: string;
 	taskId: string;
 	variant?: "default" | "sidebar";
 }) {
@@ -31,83 +28,89 @@ export function TaskDiscussion({
 	const [limit, setLimit] = useState(50);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState("");
-	const refreshDiscussion = useCallback(async () => {
-		setIsLoading(true);
-		setError("");
+	const refreshDiscussion = useCallback(
+		async (showLoading = false) => {
+			if (showLoading) setIsLoading(true);
+			setError("");
 
-		try {
-			const result = await getTaskDiscussionAction(taskId);
+			try {
+				const result = await getTaskDiscussionAction(taskId);
 
-			if (!result.discussion) {
-				setError(result.message || "Unable to load task discussion");
-				return;
+				if (!result.discussion) {
+					setError(result.message || "Unable to load task discussion");
+					return;
+				}
+
+				setComments(result.discussion.comments);
+				setActivities(result.discussion.activities);
+				setLimit(result.discussion.limit);
+			} catch {
+				setError("Unable to load task discussion");
+			} finally {
+				setIsLoading(false);
 			}
-
-			setComments(result.discussion.comments);
-			setActivities(result.discussion.activities);
-			setLimit(result.discussion.limit);
-		} catch {
-			setError("Unable to load task discussion");
-		} finally {
-			setIsLoading(false);
-		}
-	}, [taskId]);
+		},
+		[taskId],
+	);
 
 	useEffect(() => {
+		void refreshDiscussion(true);
+	}, [refreshDiscussion]);
+
+	const handleRefresh = useCallback(() => {
 		void refreshDiscussion();
 	}, [refreshDiscussion]);
 
-	if (isLoading) return <DiscussionSkeleton variant={variant} />;
+	const containerClassName = getDiscussionContainerClass(variant);
+
+	if (isLoading) {
+		return <TaskDiscussionSkeleton className={containerClassName} />;
+	}
 
 	if (error) {
 		return (
-			<div className={discussionContainerClass(variant)}>
+			<div className={containerClassName}>
 				<p className="text-sm text-red-600 dark:text-red-400" role="alert">
 					{error}
 				</p>
-				<button
+				<Button
 					type="button"
-					onClick={() => void refreshDiscussion()}
-					className="mt-2 text-xs text-brand hover:underline"
+					variant="link"
+					size="sm"
+					onClick={() => void refreshDiscussion(true)}
+					className="-ml-3 mt-1"
 				>
 					Try again
-				</button>
+				</Button>
 			</div>
 		);
 	}
 
 	return (
-		<div className={discussionContainerClass(variant)}>
+		<div className={containerClassName}>
 			<CommentsSection
-				projectId={projectId}
 				taskId={taskId}
 				comments={comments}
 				limit={limit}
 				variant={variant}
-				onRefresh={() => void refreshDiscussion()}
+				onRefresh={handleRefresh}
 			/>
-			<ActivitySection activities={activities} limit={limit} />
+			<div
+				className={
+					variant === "sidebar"
+						? "border-t border-border pt-6"
+						: "border-t border-border pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0"
+				}
+			>
+				<ActivitySection activities={activities} limit={limit} />
+			</div>
 		</div>
 	);
 }
 
-function DiscussionSkeleton({ variant }: { variant: "default" | "sidebar" }) {
-	return (
-		<div className={discussionContainerClass(variant)}>
-			{discussionSkeletonSections.map((section) => (
-				<div key={section} className="space-y-3">
-					<Skeleton className="h-5 w-28" />
-					<Skeleton className="h-16 w-full" />
-					<Skeleton className="h-16 w-full" />
-					<Skeleton className="h-20 w-full" />
-				</div>
-			))}
-		</div>
-	);
-}
-
-function discussionContainerClass(variant: "default" | "sidebar") {
+// Loading, error, and loaded states layout
+function getDiscussionContainerClass(variant: "default" | "sidebar") {
 	return variant === "sidebar"
 		? "grid content-start gap-6 bg-surface-panel p-5"
-		: "mt-6 grid gap-6 border-t border-french_gray-300 pt-5 dark:border-paynes_gray-400 md:grid-cols-2";
+		: "mt-6 grid gap-6 border-t border-border pt-5 md:grid-cols-2";
 }

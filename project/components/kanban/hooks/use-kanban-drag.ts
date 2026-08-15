@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useEffect, useRef, useState } from "react";
-import { moveListAction } from "@/app/(dashboard)/projects/[id]/list-actions";
+import { moveListToPositionAction } from "@/app/(dashboard)/projects/[id]/list-actions";
 import { saveBoardLayoutAction } from "@/app/(dashboard)/projects/[id]/task-actions";
 import {
 	findTaskLocation,
@@ -24,15 +24,17 @@ import {
 	useBoardStore,
 } from "@/stores/board-store";
 
+interface UseKanbanDragOptions {
+	projectId: string;
+	lists: BoardList[];
+	dragEnabled: boolean;
+}
+
 export function useKanbanDrag({
 	projectId,
 	lists,
 	dragEnabled,
-}: {
-	projectId: string;
-	lists: BoardList[];
-	dragEnabled: boolean;
-}) {
+}: UseKanbanDragOptions) {
 	const {
 		projectId: storedProjectId,
 		lists: storedLists,
@@ -63,17 +65,20 @@ export function useKanbanDrag({
 	const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 	const [activeListId, setActiveListId] = useState<string | null>(null);
 	const [listMoveError, setListMoveError] = useState("");
+	const [isSavingListMove, setIsSavingListMove] = useState(false);
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
 		useSensor(KeyboardSensor, {
 			coordinateGetter: sortableKeyboardCoordinates,
 		}),
 	);
-	const boardLists = storedProjectId === projectId ? storedLists : lists;
+	// Filtered boards use server props so hidden tasks do not enter drag state
+	const boardLists =
+		dragEnabled && storedProjectId === projectId ? storedLists : lists;
 
 	useEffect(() => {
-		syncBoard(projectId, lists);
-	}, [lists, projectId, syncBoard]);
+		if (dragEnabled) syncBoard(projectId, lists);
+	}, [dragEnabled, lists, projectId, syncBoard]);
 
 	function handleDragStart(event: DragStartEvent) {
 		if (event.active.data.current?.kind === "list") {
@@ -161,7 +166,7 @@ export function useKanbanDrag({
 			}
 
 			reorderLists(origin.listId, targetListId);
-			void persistListMove(origin.listId, origin.index, targetIndex);
+			void persistListMove(origin.listId, targetIndex);
 			return;
 		}
 
@@ -199,32 +204,28 @@ export function useKanbanDrag({
 		scheduleSave();
 	}
 
-	async function persistListMove(
-		listId: string,
-		fromIndex: number,
-		toIndex: number,
-	) {
-		const direction = toIndex < fromIndex ? "left" : "right";
-		const moveCount = Math.abs(toIndex - fromIndex);
-
+	async function persistListMove(listId: string, targetPosition: number) {
+		setIsSavingListMove(true);
 		try {
-			for (let moveIndex = 0; moveIndex < moveCount; moveIndex += 1) {
-				const formData = new FormData();
-				formData.set("projectId", projectId);
-				formData.set("listId", listId);
-				formData.set("direction", direction);
-				const result = await moveListAction(formData);
-				if (!result.success) throw new Error(result.message);
-			}
+			const result = await moveListToPositionAction({
+				projectId,
+				listId,
+				targetPosition,
+			});
+			if (!result.success) throw new Error(result.message);
+
 			confirmListOrder();
+			setListMoveError("");
 		} catch {
 			revertListOrder();
 			setListMoveError("Unable to save the column position. Please try again.");
 		} finally {
+			setIsSavingListMove(false);
 			stopDragging();
 		}
 	}
 
+	// Briefly wait so rapid task moves can share one board snapshot
 	function scheduleSave(delay = 250) {
 		if (saveTimer.current) clearTimeout(saveTimer.current);
 
@@ -238,6 +239,7 @@ export function useKanbanDrag({
 		if (saveInFlight.current) return;
 
 		const state = useBoardStore.getState();
+		// Save this group without discarding moves queued during the request
 		const capturedMoves = [...state.pendingMoves];
 		if (capturedMoves.length === 0) return;
 
@@ -276,6 +278,7 @@ export function useKanbanDrag({
 		pendingMoves,
 		moveError,
 		listMoveError,
+		isSavingListMove,
 		activeTaskId,
 		activeListId,
 		bulkMode,

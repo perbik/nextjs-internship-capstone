@@ -38,6 +38,7 @@ export interface TaskFormOptions {
 	labels: TaskLabelOption[];
 	canManageLabels?: boolean;
 	initialListId?: string;
+	defaultDueDate?: string;
 	task?: EditableTask;
 	projectOptions?: TaskProjectOption[];
 }

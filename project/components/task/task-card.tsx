@@ -3,13 +3,18 @@ import { CSS } from "@dnd-kit/utilities";
 import { Calendar } from "lucide-react";
 import { type CSSProperties, useState } from "react";
 import type { TaskLabelOption } from "@/components/project/project-labels";
-import {
-	type EditableTask,
-	EditTaskModal,
-	type TaskListOption,
-	type TaskMemberOption,
-} from "@/components/task/create-task-modal";
+import { EditTaskModal } from "@/components/task/create-task-modal";
+import { PriorityBadge } from "@/components/task/priority-badge";
 import { TaskActionsMenu } from "@/components/task/task-actions-menu";
+import type {
+	EditableTask,
+	TaskListOption,
+	TaskMemberOption,
+} from "@/components/task/task-modal-types";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { getInitials } from "@/lib/avatar-utils";
+import { formatUtcDate } from "@/lib/date-utils";
 import { useUIStore } from "@/stores/ui-store";
 
 interface TaskCardProps {
@@ -32,33 +37,12 @@ interface TaskCardProps {
 	onToggleSelection: () => void;
 }
 
+// Identifies the task's current position during a drag operation
 export interface TaskDragData {
 	kind: "task";
 	taskId: string;
 	listId: string;
 	index: number;
-}
-
-const priorityClasses = {
-	low: "bg-[#7cd278]/10 text-[#4db04f] dark:bg-green-900/40 dark:text-green-300",
-	medium: "bg-[#37a5ff]/10 text-[#37a5ff] dark:bg-sky-900/40 dark:text-sky-300",
-	high: "bg-[#ff3737]/10 text-[#ff3737] dark:bg-red-900/40 dark:text-red-300",
-} as const;
-
-const avatarClasses = [
-	"bg-brand",
-	"bg-[#6366f1]",
-	"bg-[#0ea5e9]",
-	"bg-[#4db04f]",
-] as const;
-
-function formatDueDate(value: string | Date) {
-	return new Intl.DateTimeFormat("en-US", {
-		month: "2-digit",
-		day: "2-digit",
-		year: "numeric",
-		timeZone: "UTC",
-	}).format(new Date(value));
 }
 
 export function TaskCard({
@@ -75,8 +59,12 @@ export function TaskCard({
 	onToggleSelection,
 }: TaskCardProps) {
 	const [actionsOpen, setActionsOpen] = useState(false);
-	const sortableDisabled = dragDisabled || actionsOpen;
+	const activeModalId = useUIStore((state) => state.activeModalId);
+	const sortableDisabled =
+		dragDisabled || actionsOpen || activeModalId !== null;
 	const openModal = useUIStore((state) => state.openModal);
+
+	// Connect this task and its board position to dnd-kit
 	const {
 		attributes,
 		listeners,
@@ -91,35 +79,25 @@ export function TaskCard({
 			taskId: task.id,
 			listId: task.listId,
 			index,
-		},
+		} satisfies TaskDragData,
 		disabled: sortableDisabled,
 	});
 	const style: CSSProperties = {
 		transform: CSS.Transform.toString(transform),
 		transition,
 	};
+
+	// Prepare the fallback avatar details shown in the card footer
 	const assigneeName = task.assignee
 		? [task.assignee.firstName, task.assignee.lastName]
 				.filter(Boolean)
 				.join(" ") || task.assignee.email
 		: "Unassigned";
-	const assigneeInitials = task.assignee
-		? assigneeName
-				.split(/\s+/)
-				.slice(0, 2)
-				.map((part) => part[0]?.toUpperCase())
-				.join("")
-		: "—";
-	const avatarClass = task.assignee
-		? avatarClasses[
-				assigneeName
-					.split("")
-					.reduce((total, character) => total + character.charCodeAt(0), 0) %
-					avatarClasses.length
-			]
-		: "bg-[#a8a8a8]";
+	const assigneeInitials = task.assignee ? getInitials(assigneeName) : "—";
+	const avatarClass = task.assignee ? "bg-brand" : "bg-muted-foreground";
 
 	return (
+		// The whole card is draggable normally and selectable in bulk mode
 		<article
 			ref={setNodeRef}
 			style={style}
@@ -132,11 +110,15 @@ export function TaskCard({
 					: `${task.title}. Drag to reorder or move to another column.`
 			}
 			onClick={(event) => {
+				// Interactive controls handle their own click without opening the task
 				if (
-					bulkMode ||
-					(event.target instanceof HTMLElement &&
-						Boolean(event.target.closest("button, input, label, a")))
+					event.target instanceof HTMLElement &&
+					event.target.closest("button, input, label, a")
 				) {
+					return;
+				}
+				if (bulkMode) {
+					onToggleSelection();
 					return;
 				}
 
@@ -147,86 +129,86 @@ export function TaskCard({
 					openModal(`edit-task:${task.id}`);
 				}
 			}}
-			className={`touch-pan-y rounded-xl border border-input bg-card p-3 shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-[opacity,box-shadow,border-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30  bg-control ${
+			className={`touch-pan-y rounded-xl border border-input bg-card p-3 shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-[opacity,box-shadow,border-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
 				bulkMode
 					? "cursor-pointer"
 					: sortableDisabled
 						? "cursor-default"
-						: "cursor-grab hover:border-blue_munsell-400 hover:shadow-md active:cursor-grabbing"
-			} ${selected ? "border-blue_munsell-500 ring-2 ring-blue_munsell-500/30" : ""} ${isDragging ? "opacity-40" : ""}`}
+						: "cursor-grab hover:border-brand/50 hover:shadow-md active:cursor-grabbing"
+			} ${selected ? "border-brand ring-2 ring-brand/30" : ""} ${isDragging ? "opacity-40" : ""}`}
 		>
+			{/* Task title and the current card action */}
 			<div className="flex items-start justify-between gap-2">
-				{bulkMode && (
-					<input
-						type="checkbox"
-						checked={selected}
-						onChange={onToggleSelection}
-						aria-label={`Select ${task.title}`}
-						className="mt-0.5 size-4 shrink-0 accent-blue_munsell-500"
-					/>
-				)}
 				<div className="min-w-0">
 					<h3 className="truncate text-sm font-bold text-foreground ">
 						{task.title}
 					</h3>
 				</div>
-				{!bulkMode && (
-					<div className="shrink-0">
-						<TaskActionsMenu
-							projectId={projectId}
-							taskId={task.id}
-							taskTitle={task.title}
-							onOpenChange={setActionsOpen}
+				<div className="flex size-6 shrink-0 items-center justify-center">
+					{bulkMode ? (
+						<Checkbox
+							checked={selected}
+							onCheckedChange={onToggleSelection}
+							aria-label={`Select ${task.title}`}
+							className="size-5 rounded-md border-2 border-muted-foreground/40 bg-card text-white shadow-sm transition-colors hover:border-brand hover:bg-brand/5 focus-visible:ring-brand/30 data-[state=checked]:border-brand data-[state=checked]:bg-brand data-[state=checked]:text-white [&_svg]:size-3"
 						/>
-						<EditTaskModal
-							projectId={projectId}
-							lists={lists}
-							members={members}
-							labels={labels}
-							canManageLabels={canManageLabels}
-							task={task}
-							showTrigger={false}
-						/>
-					</div>
-				)}
+					) : (
+						<>
+							<TaskActionsMenu
+								projectId={projectId}
+								taskId={task.id}
+								taskTitle={task.title}
+								onOpenChange={setActionsOpen}
+							/>
+							<EditTaskModal
+								projectId={projectId}
+								lists={lists}
+								members={members}
+								labels={labels}
+								canManageLabels={canManageLabels}
+								task={task}
+								showTrigger={false}
+							/>
+						</>
+					)}
+				</div>
 			</div>
 
+			{/* Optional task description */}
 			{task.description && (
 				<p className="mt-2 line-clamp-2 text-xs leading-[16.5px] text-muted-foreground ">
 					{task.description}
 				</p>
 			)}
 
+			{/* User-defined task labels */}
 			{task.labels.length > 0 && (
 				<div className="mt-2 flex flex-wrap gap-1">
 					{task.labels.map((label) => (
-						<span
+						<Badge
 							key={label.id}
-							className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
+							className="border-0 px-2 py-0.5 text-[10px] font-medium text-white hover:opacity-90"
 							style={{ backgroundColor: label.color }}
 						>
 							{label.name}
-						</span>
+						</Badge>
 					))}
 				</div>
 			)}
 
+			{/* Priority, deadline, and assignee summary */}
 			<div className="mt-3 flex min-h-8 items-center justify-between gap-2 pt-1">
 				<div className="flex min-w-0 items-center gap-2">
-					<span
-						className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold capitalize ${priorityClasses[task.priority]}`}
-					>
-						{task.priority}
-					</span>
+					<PriorityBadge priority={task.priority} />
 					{task.dueDate && (
 						<span className="flex items-center gap-1 text-[10px] text-muted-foreground">
 							<Calendar size={11} />
-							{formatDueDate(task.dueDate)}
+							{formatUtcDate(task.dueDate)}
 						</span>
 					)}
 				</div>
 				<span
-					className="flex min-w-0 items-center gap-1 text-xs text-paynes_gray-500 dark:text-french_gray-400"
+					className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
 					title={assigneeName}
 				>
 					<span

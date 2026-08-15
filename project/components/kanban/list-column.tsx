@@ -12,6 +12,13 @@ import { ListActionsPopover } from "@/components/kanban/list-actions-popover";
 import type { ListColumnProps } from "@/components/kanban/types";
 import { CreateTaskModal } from "@/components/task/create-task-modal";
 import { TaskCard } from "@/components/task/task-card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useBoardStore } from "@/stores/board-store";
 
 export function ListColumn({
@@ -48,7 +55,8 @@ export function ListColumn({
 	const toggleTaskSelection = useBoardStore(
 		(state) => state.toggleTaskSelection,
 	);
-	const statusStyle = columnStatusStyle(list.name, list.isCompleted);
+	const statusStyle = columnStatusStyle(list.isCompleted);
+	const taskCountLabel = `${list.tasks.length} ${list.tasks.length === 1 ? "task" : "tasks"}`;
 
 	return (
 		<section
@@ -57,58 +65,80 @@ export function ListColumn({
 				transform: CSS.Transform.toString(columnTransform),
 				transition: columnTransition,
 			}}
-			className={`flex h-[488px] w-80 min-w-70 shrink-0 flex-col overflow-hidden rounded-2xl border border-input bg-surface-column ${isColumnDragging ? "opacity-35" : ""}`}
+			className={`flex h-122 w-80 min-w-70 shrink-0 flex-col overflow-hidden rounded-md border border-input bg-surface-column ${isColumnDragging ? "opacity-35" : ""}`}
 		>
-			<header className="border-b border-input px-4 py-3 ">
+			<header className="border-b border-input px-4 py-3">
 				<div className="flex items-center justify-between gap-2">
 					<div className="flex min-w-0 items-center gap-1.5">
 						{canManage && (
-							<button
-								type="button"
-								aria-label={`Drag ${list.name} column`}
-								className="-ml-1 flex size-6 shrink-0 touch-none items-center justify-center rounded text-muted-foreground hover:bg-black/5 hover:text-brand disabled:cursor-default disabled:opacity-40 dark:hover:bg-card/10"
-								disabled={columnDragDisabled}
-								{...columnAttributes}
-								{...columnListeners}
-							>
-								<GripVertical size={15} />
-							</button>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										aria-label={`Drag column: ${list.name}`}
+										className="-ml-1 size-6 shrink-0 touch-none rounded text-muted-foreground hover:bg-brand/5 hover:text-brand disabled:cursor-default disabled:opacity-40"
+										disabled={columnDragDisabled}
+										{...columnAttributes}
+										{...columnListeners}
+									>
+										<GripVertical size={15} aria-hidden="true" />
+									</Button>
+								</TooltipTrigger>
+								<TooltipContent>Drag column: {list.name}</TooltipContent>
+							</Tooltip>
 						)}
 						<h2
 							className={`flex min-w-0 items-center gap-2 truncate text-sm font-bold ${statusStyle.text}`}
 						>
 							{list.name}
 							{list.isCompleted && (
-								<CheckCircle
-									size={15}
-									className="shrink-0 text-green-600 dark:text-green-400"
-									aria-label="Completed column"
-								/>
+								<>
+									<CheckCircle
+										size={15}
+										className="shrink-0 text-green-600 dark:text-green-400"
+										aria-hidden="true"
+									/>
+									<span className="sr-only">Completed column</span>
+								</>
 							)}
 						</h2>
-						<span
-							className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${statusStyle.badge}`}
+						<Badge
+							variant="secondary"
+							className={`shrink-0 border-0 px-2 py-0.5 text-xs font-bold ${statusStyle.badge}`}
 						>
 							<span aria-hidden="true">{list.tasks.length}</span>
-							<span className="sr-only">{list.tasks.length} tasks</span>
-						</span>
+							<span className="sr-only">{taskCountLabel}</span>
+						</Badge>
 					</div>
 
-					{canManage && (
-						<ListActionsPopover
+					<div className="flex items-center gap-1">
+						{canManage && (
+							<ListActionsPopover
+								projectId={projectId}
+								list={list}
+								canMoveLeft={canMoveLeft}
+								canMoveRight={canMoveRight}
+							/>
+						)}
+						<CreateTaskModal
 							projectId={projectId}
-							list={list}
-							canMoveLeft={canMoveLeft}
-							canMoveRight={canMoveRight}
+							lists={lists}
+							members={members}
+							labels={labels}
+							canManageLabels={canManage}
+							initialListId={list.id}
+							triggerVariant="columnIcon"
 						/>
-					)}
+					</div>
 				</div>
 			</header>
 
 			<div
 				ref={dropRef}
 				className={`kanban-column-scrollbar min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3 transition-colors ${
-					isDropTarget ? "bg-blue_munsell-50 dark:bg-blue_munsell-900/20" : ""
+					isDropTarget ? "bg-brand/5 dark:bg-brand/10" : ""
 				}`}
 			>
 				<SortableContext
@@ -133,7 +163,7 @@ export function ListColumn({
 							/>
 						))
 					) : (
-						<p className="py-8 text-center text-sm text-paynes_gray-500 dark:text-french_gray-400">
+						<p className="py-8 text-center text-sm text-muted-foreground">
 							No tasks in this column
 						</p>
 					)}
@@ -151,23 +181,17 @@ export function ListColumn({
 	);
 }
 
-function columnStatusStyle(name: string, isCompleted: boolean) {
+function columnStatusStyle(isCompleted: boolean) {
 	if (isCompleted) {
 		return {
-			text: "text-[#4db04f]",
-			badge: "bg-[#4db04f]/13 text-[#4db04f]",
-		};
-	}
-
-	if (name.toLowerCase().includes("progress")) {
-		return {
-			text: "text-[#ff9500]",
-			badge: "bg-[#ff9500]/13 text-[#ff9500]",
+			text: "text-green-600 dark:text-green-400",
+			badge:
+				"bg-green-500/10 text-green-600 hover:bg-green-500/10 dark:text-green-400",
 		};
 	}
 
 	return {
-		text: "text-[#fe5f25]",
-		badge: "bg-[#fe5f25]/13 text-[#fe5f25]",
+		text: "text-brand",
+		badge: "bg-brand/10 text-brand hover:bg-brand/10",
 	};
 }

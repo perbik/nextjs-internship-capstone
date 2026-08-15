@@ -26,6 +26,7 @@ interface TaskMutationData {
 	labelIds: string[];
 }
 
+// Load a list and require access to its project
 async function getAccessibleList(listId: string, userId: string) {
 	const [list] = await db
 		.select()
@@ -40,6 +41,7 @@ async function getAccessibleList(listId: string, userId: string) {
 	return list;
 }
 
+// Require the selected assignee to belong to the project
 async function requireProjectAssignee(
 	projectId: string,
 	assigneeId?: string | null,
@@ -64,6 +66,7 @@ async function requireProjectAssignee(
 	}
 }
 
+// Require unique labels that belong to the project
 async function requireProjectLabels(projectId: string, labelIds: string[]) {
 	if (labelIds.length === 0) {
 		return;
@@ -85,6 +88,7 @@ async function requireProjectLabels(projectId: string, labelIds: string[]) {
 	}
 }
 
+// Replace a task's current label links
 async function syncTaskLabels(taskId: string, labelIds: string[]) {
 	await db.delete(taskLabels).where(eq(taskLabels.taskId, taskId));
 
@@ -95,6 +99,7 @@ async function syncTaskLabels(taskId: string, labelIds: string[]) {
 	}
 }
 
+// Mark the parent project as recently updated
 async function touchProject(projectId: string) {
 	await db
 		.update(projects)
@@ -102,10 +107,12 @@ async function touchProject(projectId: string) {
 		.where(eq(projects.id, projectId));
 }
 
+// Compare optional dates by their stored time
 function sameDate(left: Date | null, right: Date | null) {
 	return left?.getTime() === right?.getTime();
 }
 
+// Show a member's name or use their email as a fallback
 function userDisplayName(user: {
 	firstName: string | null;
 	lastName: string | null;
@@ -116,6 +123,7 @@ function userDisplayName(user: {
 	);
 }
 
+// Create a task at the end of an accessible list
 export async function createTask(userId: string, data: TaskMutationData) {
 	const list = await getAccessibleList(data.listId, userId);
 	await requireProjectAssignee(list.projectId, data.assigneeId);
@@ -153,9 +161,10 @@ export async function createTask(userId: string, data: TaskMutationData) {
 			listCompleted: list.isCompleted,
 		},
 	});
-	return task;
+	return { task, projectId: list.projectId };
 }
 
+// Update a task and record each changed field
 export async function updateTask(
 	taskId: string,
 	userId: string,
@@ -253,6 +262,7 @@ export async function updateTask(
 	}
 
 	if (currentTask.task.description !== (data.description ?? null)) {
+		// Do not store full descriptions inside activity history
 		fieldChanges.push({ field: "description", from: null, to: null });
 	}
 
@@ -362,9 +372,93 @@ export async function updateTask(
 			},
 		});
 	}
-	return task;
+	return { task, projectId: currentTask.projectId };
 }
 
+// Soft delete a task and close its position gap in one transaction
+export async function deleteTask(
+	taskId: string,
+	projectId: string,
+	userId: string,
+) {
+	const [currentTask] = await db
+		.select({
+			task: tasks,
+			projectId: lists.projectId,
+			listName: lists.name,
+		})
+		.from(tasks)
+		.innerJoin(lists, eq(tasks.listId, lists.id))
+		.where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt)))
+		.limit(1);
+
+	if (
+		!currentTask ||
+		currentTask.projectId !== projectId ||
+		!(await canAccessProject(currentTask.projectId, userId))
+	) {
+		throw new Error("You do not have permission to delete this task");
+	}
+
+	const deletedAt = new Date();
+	const databaseUrl = process.env.DATABASE_URL;
+
+	if (!databaseUrl) {
+		throw new Error("DATABASE_URL is required");
+	}
+
+	// Use the WebSocket driver because this operation needs a transaction
+	const pool = new Pool({ connectionString: databaseUrl });
+	const transactionDb = drizzle({ client: pool, schema });
+
+	try {
+		await transactionDb.transaction(async (tx) => {
+			const [deletedTask] = await tx
+				.update(tasks)
+				.set({ deletedAt, updatedAt: deletedAt })
+				.where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt)))
+				.returning({ id: tasks.id });
+
+			if (!deletedTask) {
+				throw new Error("This task has already been deleted");
+			}
+
+			await tx
+				.update(tasks)
+				.set({
+					position: sql`${tasks.position} - 1`,
+					updatedAt: deletedAt,
+				})
+				.where(
+					and(
+						eq(tasks.listId, currentTask.task.listId),
+						gt(tasks.position, currentTask.task.position),
+						isNull(tasks.deletedAt),
+					),
+				);
+
+			await tx.insert(activityLogs).values({
+				projectId: currentTask.projectId,
+				taskId,
+				actorId: userId,
+				action: "task_deleted",
+				metadata: {
+					title: currentTask.task.title,
+					listName: currentTask.listName,
+				},
+			});
+
+			await tx
+				.update(projects)
+				.set({ updatedAt: deletedAt })
+				.where(eq(projects.id, currentTask.projectId));
+		});
+	} finally {
+		await pool.end();
+	}
+}
+
+// Save every task's list and position in one transaction
 export async function saveBoardLayout(
 	projectId: string,
 	userId: string,
@@ -380,11 +474,13 @@ export async function saveBoardLayout(
 		throw new Error("DATABASE_URL is required");
 	}
 
+	// Use the WebSocket driver because this operation needs a transaction
 	const pool = new Pool({ connectionString: databaseUrl });
 	const transactionDb = drizzle({ client: pool, schema });
 
 	try {
 		await transactionDb.transaction(async (tx) => {
+			// Prevent two board saves from changing the same project together
 			await tx.execute(
 				sql`select pg_advisory_xact_lock(hashtextextended(${projectId}, 0))`,
 			);
@@ -404,6 +500,7 @@ export async function saveBoardLayout(
 			);
 			const submittedListIds = layout.map(({ id }) => id);
 
+			// Reject layouts with missing, extra, or repeated columns
 			if (
 				submittedListIds.length !== validListIds.size ||
 				new Set(submittedListIds).size !== submittedListIds.length ||
@@ -428,6 +525,7 @@ export async function saveBoardLayout(
 			const currentTasks = new Map(projectTasks.map((task) => [task.id, task]));
 			const submittedTaskIds = layout.flatMap(({ taskIds }) => taskIds);
 
+			// Reject layouts with missing, extra, or repeated tasks
 			if (
 				submittedTaskIds.length !== validTaskIds.size ||
 				new Set(submittedTaskIds).size !== submittedTaskIds.length ||
@@ -458,14 +556,12 @@ export async function saveBoardLayout(
 					.where(and(inArray(tasks.id, list.taskIds), isNull(tasks.deletedAt)));
 			}
 
+			// Record meaningful column changes, not position-only reordering
 			const activityValues = layout.flatMap((list) =>
-				list.taskIds.flatMap((taskId, position) => {
+				list.taskIds.flatMap((taskId) => {
 					const current = currentTasks.get(taskId);
 
-					if (
-						!current ||
-						(current.listId === list.id && current.position === position)
-					) {
+					if (!current || current.listId === list.id) {
 						return [];
 					}
 
@@ -474,22 +570,12 @@ export async function saveBoardLayout(
 							projectId,
 							taskId,
 							actorId: userId,
-							action:
-								current.listId === list.id ? "task_reordered" : "task_moved",
+							action: "task_moved",
 							metadata: {
 								title: current.title,
-								fromListName:
-									current.listId === list.id
-										? null
-										: (listNames.get(current.listId) ?? "Unknown column"),
-								toListName:
-									current.listId === list.id
-										? null
-										: (listNames.get(list.id) ?? "Unknown column"),
-								toListCompleted:
-									current.listId === list.id
-										? null
-										: (completedLists.get(list.id) ?? false),
+								fromListName: listNames.get(current.listId) ?? "Unknown column",
+								toListName: listNames.get(list.id) ?? "Unknown column",
+								toListCompleted: completedLists.get(list.id) ?? false,
 							},
 						},
 					];

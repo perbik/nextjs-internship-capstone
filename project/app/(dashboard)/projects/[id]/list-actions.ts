@@ -7,9 +7,10 @@ import {
 	createList,
 	deleteList,
 	moveList,
+	moveListToPosition,
 	updateList,
 } from "@/lib/db/mutations";
-import { listCreateSchema, listUpdateSchema } from "@/lib/validations";
+import { listCreateSchema, listSchema } from "@/lib/validations";
 
 export interface ListActionState {
 	message: string;
@@ -17,9 +18,26 @@ export interface ListActionState {
 	errors?: Record<string, string[]>;
 }
 
-const listIdSchema = z.uuid("List must be a valid ID");
-const directionSchema = z.enum(["left", "right"]);
+const LIST_ID_SCHEMA = z.uuid("List must be a valid ID");
+const DIRECTION_SCHEMA = z.enum(["left", "right"]);
+const LIST_POSITION_SCHEMA = z.object({
+	projectId: z.uuid(),
+	listId: z.uuid(),
+	targetPosition: z.number().int().nonnegative(),
+});
 
+const LIST_ACTION_MESSAGES = new Set([
+	"You must be signed in",
+	"Your ProjectFlow account is not synchronized yet",
+	"You do not have permission to manage this list",
+	"A project must keep at least one completed column",
+	"You do not have permission to add lists to this project",
+	"A project must keep at least one list",
+	"Move or delete the tasks in this column before deleting it",
+	"The column no longer exists",
+]);
+
+// Shared helpers for column actions
 function formValue(formData: FormData, key: string) {
 	const value = formData.get(key);
 	return typeof value === "string" ? value : undefined;
@@ -39,112 +57,174 @@ function validationState(
 	};
 }
 
+function actionError(error: unknown, fallback: string): ListActionState {
+	if (error instanceof Error && LIST_ACTION_MESSAGES.has(error.message)) {
+		return { message: error.message };
+	}
+
+	console.error(fallback, error);
+	return { message: fallback };
+}
+
+function revalidateListViews(projectId: string) {
+	revalidatePath(`/projects/${projectId}`);
+	revalidatePath("/projects");
+	revalidatePath("/dashboard");
+	revalidatePath("/calendar");
+	revalidatePath("/analytics");
+}
+
+// Create a column at the end of a project board
 export async function createListAction(
 	_previousState: ListActionState,
 	formData: FormData,
 ): Promise<ListActionState> {
-	const parsed = listCreateSchema.safeParse({
-		projectId: formValue(formData, "projectId"),
-		name: formValue(formData, "name"),
-		isCompleted: formData.get("isCompleted") === "on",
-	});
-
-	if (!parsed.success) {
-		return validationState(
-			"Please correct the list fields",
-			parsed.error.flatten().fieldErrors,
-		);
-	}
+	let savedProjectId: string;
 
 	try {
 		const user = await requireCurrentUser();
-		await createList(parsed.data.projectId, user.id, {
+		const parsed = listCreateSchema.safeParse({
+			projectId: formValue(formData, "projectId"),
+			name: formValue(formData, "name"),
+			isCompleted: formData.get("isCompleted") === "on",
+		});
+
+		if (!parsed.success) {
+			return validationState(
+				"Please correct the list fields",
+				parsed.error.flatten().fieldErrors,
+			);
+		}
+
+		const list = await createList(parsed.data.projectId, user.id, {
 			name: parsed.data.name,
 			isCompleted: parsed.data.isCompleted ?? false,
 		});
+		savedProjectId = list.projectId;
 	} catch (error) {
-		return {
-			message:
-				error instanceof Error ? error.message : "Unable to add the list",
-		};
+		return actionError(error, "Unable to add the list");
 	}
 
-	revalidatePath(`/projects/${parsed.data.projectId}`);
-	revalidatePath("/dashboard");
+	revalidateListViews(savedProjectId);
 	return { message: "List added", success: true };
 }
 
+// Update a column's name and completion behavior
 export async function updateListAction(
 	_previousState: ListActionState,
 	formData: FormData,
 ): Promise<ListActionState> {
-	const listId = listIdSchema.safeParse(formValue(formData, "listId"));
-	const projectId = z.uuid().safeParse(formValue(formData, "projectId"));
-	const parsed = listUpdateSchema.safeParse({
-		name: formValue(formData, "name"),
-		isCompleted: formData.get("isCompleted") === "on",
-	});
-
-	if (!listId.success || !projectId.success || !parsed.success) {
-		return parsed.success
-			? { message: "Invalid list or project ID" }
-			: validationState(
-					"Please correct the list fields",
-					parsed.error.flatten().fieldErrors,
-				);
-	}
+	let savedProjectId: string;
 
 	try {
 		const user = await requireCurrentUser();
-		await updateList(listId.data, user.id, {
-			name: parsed.data.name ?? "",
+		const listId = LIST_ID_SCHEMA.safeParse(formValue(formData, "listId"));
+		const projectId = z.uuid().safeParse(formValue(formData, "projectId"));
+		const parsed = listSchema.safeParse({
+			name: formValue(formData, "name"),
+			isCompleted: formData.get("isCompleted") === "on",
+		});
+
+		if (!listId.success || !projectId.success || !parsed.success) {
+			return parsed.success
+				? { message: "Invalid list or project ID" }
+				: validationState(
+						"Please correct the list fields",
+						parsed.error.flatten().fieldErrors,
+					);
+		}
+
+		const result = await updateList(listId.data, user.id, {
+			name: parsed.data.name,
 			isCompleted: parsed.data.isCompleted ?? false,
 		});
+		savedProjectId = result.projectId;
 	} catch (error) {
-		return {
-			message:
-				error instanceof Error ? error.message : "Unable to update the list",
-		};
+		return actionError(error, "Unable to update the list");
 	}
 
-	revalidatePath(`/projects/${projectId.data}`);
-	revalidatePath("/dashboard");
+	revalidateListViews(savedProjectId);
 	return { message: "List updated", success: true };
 }
 
+// Delete an empty column while preserving board invariants
 export async function deleteListAction(
 	_previousState: ListActionState,
 	formData: FormData,
 ): Promise<ListActionState> {
-	const listId = listIdSchema.safeParse(formValue(formData, "listId"));
-	const projectId = z.uuid().safeParse(formValue(formData, "projectId"));
-
-	if (!listId.success || !projectId.success) {
-		return { message: "Invalid list or project ID" };
-	}
+	let savedProjectId: string;
 
 	try {
 		const user = await requireCurrentUser();
-		await deleteList(listId.data, user.id);
+		const listId = LIST_ID_SCHEMA.safeParse(formValue(formData, "listId"));
+		const projectId = z.uuid().safeParse(formValue(formData, "projectId"));
+
+		if (!listId.success || !projectId.success) {
+			return { message: "Invalid list or project ID" };
+		}
+
+		const result = await deleteList(listId.data, user.id);
+		savedProjectId = result.projectId;
 	} catch (error) {
-		return {
-			message:
-				error instanceof Error ? error.message : "Unable to delete the list",
-		};
+		return actionError(error, "Unable to delete the list");
 	}
 
-	revalidatePath(`/projects/${projectId.data}`);
-	revalidatePath("/dashboard");
+	revalidateListViews(savedProjectId);
 	return { message: "List deleted", success: true };
 }
 
-export async function moveListAction(formData: FormData) {
-	const listId = listIdSchema.parse(formValue(formData, "listId"));
-	const projectId = z.uuid().parse(formValue(formData, "projectId"));
-	const direction = directionSchema.parse(formValue(formData, "direction"));
-	const user = await requireCurrentUser();
+// Move a column one position with accessible form controls
+export async function moveListAction(
+	formData: FormData,
+): Promise<ListActionState> {
+	let savedProjectId: string;
 
-	await moveList(listId, user.id, direction);
-	revalidatePath(`/projects/${projectId}`);
-	revalidatePath("/dashboard");
+	try {
+		const user = await requireCurrentUser();
+		const listId = LIST_ID_SCHEMA.safeParse(formValue(formData, "listId"));
+		const projectId = z.uuid().safeParse(formValue(formData, "projectId"));
+		const direction = DIRECTION_SCHEMA.safeParse(
+			formValue(formData, "direction"),
+		);
+
+		if (!listId.success || !projectId.success || !direction.success) {
+			return { message: "Invalid list move" };
+		}
+
+		const result = await moveList(listId.data, user.id, direction.data);
+		savedProjectId = result.projectId;
+	} catch (error) {
+		return actionError(error, "Unable to move the column");
+	}
+
+	revalidateListViews(savedProjectId);
+	return { message: "Column moved", success: true };
+}
+
+// Persist a dragged column at its final position
+export async function moveListToPositionAction(
+	input: unknown,
+): Promise<ListActionState> {
+	let savedProjectId: string;
+
+	try {
+		const user = await requireCurrentUser();
+		const parsed = LIST_POSITION_SCHEMA.safeParse(input);
+
+		if (!parsed.success) {
+			return { message: "Invalid column position" };
+		}
+
+		const result = await moveListToPosition(
+			parsed.data.listId,
+			user.id,
+			parsed.data.targetPosition,
+		);
+		savedProjectId = result.projectId;
+	} catch (error) {
+		return actionError(error, "Unable to move the column");
+	}
+
+	revalidateListViews(savedProjectId);
+	return { message: "Column moved", success: true };
 }

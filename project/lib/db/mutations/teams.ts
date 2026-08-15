@@ -9,9 +9,12 @@ import {
 	teams,
 	users,
 } from "@/lib/db/schema";
+import { withTransaction } from "@/lib/db/transaction";
 
+// Roles that can be assigned without transferring ownership
 type MemberRole = "admin" | "member";
 
+// Require the current user to be a team owner or admin
 async function requireManager(teamId: string, actorId: string) {
 	const [context] = await db
 		.select({ ownerId: teams.ownerId, actorRole: teamMembers.role })
@@ -32,6 +35,7 @@ async function requireManager(teamId: string, actorId: string) {
 	return context;
 }
 
+// Create a team and its owner membership together
 export async function createTeam(
 	ownerId: string,
 	data: { name: string; description?: string },
@@ -44,6 +48,7 @@ export async function createTeam(
 	return teamId;
 }
 
+// Add a registered user to a managed team
 export async function addTeamMember(
 	teamId: string,
 	actorId: string,
@@ -61,7 +66,7 @@ export async function addTeamMember(
 		.where(and(ilike(users.email, email), isNull(users.deletedAt)))
 		.limit(1);
 	if (!user) {
-		throw new Error("No registered ProjectFlow user was found with that email");
+		throw new Error("No registered Brix user was found with that email");
 	}
 
 	const [existing] = await db
@@ -78,6 +83,7 @@ export async function addTeamMember(
 		.where(eq(teams.id, teamId));
 }
 
+// Change a team member's role as the team owner
 export async function updateTeamMemberRole(
 	teamId: string,
 	actorId: string,
@@ -100,6 +106,7 @@ export async function updateTeamMemberRole(
 	if (!updated) throw new Error("Team member not found");
 }
 
+// Remove a member from the team and its projects
 export async function removeTeamMember(
 	teamId: string,
 	actorId: string,
@@ -120,51 +127,72 @@ export async function removeTeamMember(
 		throw new Error("Administrators can only remove regular members");
 	}
 
-	const teamProjects = await db
-		.select({ id: projects.id, ownerId: projects.ownerId })
-		.from(projects)
-		.where(and(eq(projects.teamId, teamId), isNull(projects.deletedAt)));
-	if (teamProjects.some(({ ownerId }) => ownerId === userId)) {
-		throw new Error(
-			"Transfer or delete this member's team projects before removing them",
-		);
-	}
+	await withTransaction(async (tx) => {
+		const now = new Date();
+		const teamProjects = await tx
+			.select({ id: projects.id, ownerId: projects.ownerId })
+			.from(projects)
+			.where(and(eq(projects.teamId, teamId), isNull(projects.deletedAt)));
 
-	const projectIds = teamProjects.map(({ id }) => id);
-	if (projectIds.length > 0) {
-		const assigned = await db
-			.select({ id: tasks.id })
-			.from(tasks)
-			.innerJoin(lists, eq(tasks.listId, lists.id))
-			.where(
-				and(
-					inArray(lists.projectId, projectIds),
-					eq(tasks.assigneeId, userId),
-					isNull(tasks.deletedAt),
-				),
+		if (teamProjects.some(({ ownerId }) => ownerId === userId)) {
+			throw new Error(
+				"Transfer or delete this member's team projects before removing them",
 			);
-		if (assigned.length > 0) {
-			await db
-				.update(tasks)
-				.set({ assigneeId: null, updatedAt: new Date() })
+		}
+
+		const projectIds = teamProjects.map(({ id }) => id);
+
+		if (projectIds.length > 0) {
+			const assigned = await tx
+				.select({ id: tasks.id })
+				.from(tasks)
+				.innerJoin(lists, eq(tasks.listId, lists.id))
 				.where(
-					inArray(
-						tasks.id,
-						assigned.map(({ id }) => id),
+					and(
+						inArray(lists.projectId, projectIds),
+						eq(tasks.assigneeId, userId),
+						isNull(tasks.deletedAt),
 					),
 				);
-		}
-		await db
-			.delete(projectMembers)
-			.where(
-				and(
-					inArray(projectMembers.projectId, projectIds),
-					eq(projectMembers.userId, userId),
-				),
-			);
-	}
 
-	await db
-		.delete(teamMembers)
-		.where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
+			if (assigned.length > 0) {
+				await tx
+					.update(tasks)
+					.set({ assigneeId: null, updatedAt: now })
+					.where(
+						inArray(
+							tasks.id,
+							assigned.map(({ id }) => id),
+						),
+					);
+			}
+
+			await tx
+				.delete(projectMembers)
+				.where(
+					and(
+						inArray(projectMembers.projectId, projectIds),
+						eq(projectMembers.userId, userId),
+					),
+				);
+
+			await tx
+				.update(projects)
+				.set({ updatedAt: now })
+				.where(inArray(projects.id, projectIds));
+		}
+
+		const [removedMembership] = await tx
+			.delete(teamMembers)
+			.where(
+				and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)),
+			)
+			.returning({ userId: teamMembers.userId });
+
+		if (!removedMembership) {
+			throw new Error("Team member not found");
+		}
+
+		await tx.update(teams).set({ updatedAt: now }).where(eq(teams.id, teamId));
+	});
 }

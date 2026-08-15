@@ -11,7 +11,7 @@ export async function requireCurrentUser() {
 	const user = await getUserByClerkId(clerkId);
 
 	if (!user) {
-		throw new Error("Your ProjectFlow account is not synchronized yet");
+		throw new Error("Your Brix account is not synchronized yet");
 	}
 
 	return user;

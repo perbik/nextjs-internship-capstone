@@ -3,7 +3,9 @@ import { db } from "@/lib/db";
 import { canAccessProject } from "@/lib/db/queries/project-members";
 import { lists, tasks } from "@/lib/db/schema";
 
+// Get the active tasks in a list when the user can access its project
 export async function getTasksByList(listId: string, userId: string) {
+	// Find the parent project used for the access check
 	const [list] = await db
 		.select({ projectId: lists.projectId })
 		.from(lists)
@@ -21,6 +23,7 @@ export async function getTasksByList(listId: string, userId: string) {
 		.orderBy(asc(tasks.position));
 }
 
+// Get active project tasks with their list information
 export async function getTasksByProject(projectId: string, userId: string) {
 	if (!(await canAccessProject(projectId, userId))) {
 		return [];
@@ -34,6 +37,7 @@ export async function getTasksByProject(projectId: string, userId: string) {
 		.orderBy(asc(lists.position), asc(tasks.position));
 }
 
+// Get one active task when the user can access its project
 export async function getTaskById(taskId: string, userId: string) {
 	const [result] = await db
 		.select({ task: tasks, projectId: lists.projectId })

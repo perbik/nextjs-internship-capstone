@@ -11,53 +11,89 @@ export interface LabelActionState {
 	success?: boolean;
 }
 
+const LABEL_ID_SCHEMA = z.uuid("Label must be a valid ID");
+const LABEL_ACTION_MESSAGES = new Set([
+	"You must be signed in",
+	"Your ProjectFlow account is not synchronized yet",
+	"You do not have permission to create project labels",
+	"You do not have permission to delete this label",
+	"A label with this name already exists",
+]);
+
+// Shared helpers for label actions
 function formValue(formData: FormData, key: string) {
 	const value = formData.get(key);
 	return typeof value === "string" ? value : undefined;
 }
 
+function actionError(error: unknown, fallback: string): LabelActionState {
+	if (error instanceof Error && LABEL_ACTION_MESSAGES.has(error.message)) {
+		return { message: error.message };
+	}
+
+	console.error(fallback, error);
+	return { message: fallback };
+}
+
+function revalidateLabelViews(projectId: string) {
+	revalidatePath(`/projects/${projectId}`);
+}
+
+// Create a reusable task label for a project
 export async function createLabelAction(
 	_previousState: LabelActionState,
 	formData: FormData,
 ): Promise<LabelActionState> {
-	const parsed = labelCreateSchema.safeParse({
-		projectId: formValue(formData, "projectId"),
-		name: formValue(formData, "name"),
-		color: formValue(formData, "color"),
-	});
-
-	if (!parsed.success) {
-		return {
-			message: parsed.error.issues[0]?.message ?? "Invalid label",
-		};
-	}
+	let savedProjectId: string;
 
 	try {
 		const user = await requireCurrentUser();
-		await createLabel(parsed.data.projectId, user.id, {
+		const parsed = labelCreateSchema.safeParse({
+			projectId: formValue(formData, "projectId"),
+			name: formValue(formData, "name"),
+			color: formValue(formData, "color"),
+		});
+
+		if (!parsed.success) {
+			return {
+				message: parsed.error.issues[0]?.message ?? "Invalid label",
+			};
+		}
+
+		const label = await createLabel(parsed.data.projectId, user.id, {
 			name: parsed.data.name,
 			color: parsed.data.color,
 		});
+		savedProjectId = label.projectId;
 	} catch (error) {
-		return {
-			message:
-				error instanceof Error ? error.message : "Unable to create the label",
-		};
+		return actionError(error, "Unable to create the label");
 	}
 
-	revalidatePath(`/projects/${parsed.data.projectId}`);
+	revalidateLabelViews(savedProjectId);
 	return { message: "Label created", success: true };
 }
 
-export async function deleteLabelAction(formData: FormData) {
-	const labelId = z.uuid().safeParse(formValue(formData, "labelId"));
-	const projectId = z.uuid().safeParse(formValue(formData, "projectId"));
+// Delete a label and remove it from every assigned task
+export async function deleteLabelAction(
+	_previousState: LabelActionState,
+	formData: FormData,
+): Promise<LabelActionState> {
+	let savedProjectId: string;
 
-	if (!labelId.success || !projectId.success) {
-		return;
+	try {
+		const user = await requireCurrentUser();
+		const labelId = LABEL_ID_SCHEMA.safeParse(formValue(formData, "labelId"));
+
+		if (!labelId.success) {
+			return { message: labelId.error.issues[0]?.message ?? "Invalid label" };
+		}
+
+		const result = await deleteLabel(labelId.data, user.id);
+		savedProjectId = result.projectId;
+	} catch (error) {
+		return actionError(error, "Unable to delete the label");
 	}
 
-	const user = await requireCurrentUser();
-	await deleteLabel(labelId.data, user.id);
-	revalidatePath(`/projects/${projectId.data}`);
+	revalidateLabelViews(savedProjectId);
+	return { message: "Label deleted", success: true };
 }

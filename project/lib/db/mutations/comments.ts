@@ -3,7 +3,9 @@ import { db } from "@/lib/db";
 import { recordTaskActivity } from "@/lib/db/mutations/activities";
 import { canAccessProject } from "@/lib/db/queries/project-members";
 import { comments, lists, tasks } from "@/lib/db/schema";
+import { withTransaction } from "@/lib/db/transaction";
 
+// Require an active task from a project the user can access
 async function requireAccessibleTask(taskId: string, userId: string) {
 	const [task] = await db
 		.select({
@@ -23,27 +25,32 @@ async function requireAccessibleTask(taskId: string, userId: string) {
 	return task;
 }
 
+// Add a comment and record it in task activity
 export async function createComment(
 	taskId: string,
 	authorId: string,
 	content: string,
 ) {
 	const task = await requireAccessibleTask(taskId, authorId);
-	const [comment] = await db
-		.insert(comments)
-		.values({ taskId, authorId, content })
-		.returning();
+	return withTransaction(async (tx) => {
+		const [comment] = await tx
+			.insert(comments)
+			.values({ taskId, authorId, content })
+			.returning();
 
-	await recordTaskActivity({
-		projectId: task.projectId,
-		taskId,
-		actorId: authorId,
-		action: "comment_added",
+		await recordTaskActivity({
+			projectId: task.projectId,
+			taskId,
+			actorId: authorId,
+			action: "comment_added",
+			database: tx,
+		});
+
+		return comment;
 	});
-
-	return comment;
 }
 
+// Update a comment written by the current user
 export async function updateComment(
 	commentId: string,
 	authorId: string,
@@ -71,22 +78,26 @@ export async function updateComment(
 		throw new Error("You can only edit your own comments");
 	}
 
-	const [comment] = await db
-		.update(comments)
-		.set({ content, updatedAt: new Date() })
-		.where(eq(comments.id, commentId))
-		.returning();
+	return withTransaction(async (tx) => {
+		const [comment] = await tx
+			.update(comments)
+			.set({ content, updatedAt: new Date() })
+			.where(eq(comments.id, commentId))
+			.returning();
 
-	await recordTaskActivity({
-		projectId: existing.projectId,
-		taskId: existing.taskId,
-		actorId: authorId,
-		action: "comment_updated",
+		await recordTaskActivity({
+			projectId: existing.projectId,
+			taskId: existing.taskId,
+			actorId: authorId,
+			action: "comment_updated",
+			database: tx,
+		});
+
+		return comment;
 	});
-
-	return comment;
 }
 
+// Delete a comment written by the current user
 export async function deleteComment(commentId: string, authorId: string) {
 	const [existing] = await db
 		.select({
@@ -110,11 +121,14 @@ export async function deleteComment(commentId: string, authorId: string) {
 		throw new Error("You can only delete your own comments");
 	}
 
-	await db.delete(comments).where(eq(comments.id, commentId));
-	await recordTaskActivity({
-		projectId: existing.projectId,
-		taskId: existing.taskId,
-		actorId: authorId,
-		action: "comment_deleted",
+	await withTransaction(async (tx) => {
+		await tx.delete(comments).where(eq(comments.id, commentId));
+		await recordTaskActivity({
+			projectId: existing.projectId,
+			taskId: existing.taskId,
+			actorId: authorId,
+			action: "comment_deleted",
+			database: tx,
+		});
 	});
 }

@@ -1,4 +1,4 @@
-import { AnalyticsSkeleton } from "@/components/loading/page-skeletons";
+import { AnalyticsSkeleton } from "@/components/loading";
 
 export default function Loading() {
 	return <AnalyticsSkeleton />;

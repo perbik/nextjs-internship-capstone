@@ -1,178 +1,79 @@
-import { CheckCircle, FolderKanban, ListTodo, Users } from "lucide-react";
-import Link from "next/link";
-import { CreateProjectModal } from "@/components/modals/create-project-modal";
+import { AddTeamMemberDialog } from "@/components/dashboard/add-team-members-dialog";
+import { DashboardQuickActions } from "@/components/dashboard/dashboard-quick-actions";
+import { RecentProjectsPanel } from "@/components/dashboard/recent-projects-panel";
+import { CreateProjectModal } from "@/components/project/create-project-modal";
+import { MetricCard } from "@/components/shared/metric-card";
+import { DashboardCreateTaskModal } from "@/components/task/create-task-modal";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { getDashboardData, getManageableTeamsForUser } from "@/lib/db/queries";
-
-const projectStatusLabels = {
-	active: "Active",
-	completed: "Completed",
-	on_hold: "On hold",
-} as const;
-
-const projectStatusClasses = {
-	active:
-		"bg-blue_munsell-100 text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300",
-	completed:
-		"bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-	on_hold:
-		"bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
-} as const;
+import {
+	getDashboardData,
+	getManageableTeamsForUser,
+	getTaskCreationOptions,
+} from "@/lib/db/queries";
 
 export default async function DashboardPage() {
 	const user = await requireCurrentUser();
-	const [{ stats, recentProjects }, manageableTeams] = await Promise.all([
-		getDashboardData(user.id),
-		getManageableTeamsForUser(user.id),
-	]);
-	const statCards = [
+	const [{ stats, recentProjects }, manageableTeams, taskCreationProjects] =
+		await Promise.all([
+			getDashboardData(user.id),
+			getManageableTeamsForUser(user.id),
+			getTaskCreationOptions(user.id),
+		]);
+	const name = user.firstName || user.email.split("@")[0];
+	const metrics = [
 		{
-			name: "Active Projects",
+			label: "Active Projects",
 			value: stats.activeProjects,
-			icon: FolderKanban,
+			detail: "Across accessible projects",
 		},
 		{
-			name: "Team Members",
+			label: "Team Members",
 			value: stats.teamMembers,
-			icon: Users,
+			detail: "Across accessible projects",
 		},
 		{
-			name: "Completed Tasks",
+			label: "Completed Tasks",
 			value: stats.completedTasks,
-			icon: CheckCircle,
+			detail: "Current total",
 		},
 		{
-			name: "Pending Tasks",
+			label: "Pending Tasks",
 			value: stats.pendingTasks,
-			icon: ListTodo,
+			detail: "Current total",
 		},
 	];
-
 	return (
 		<div className="space-y-6">
-			<div>
-				<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
-					Dashboard
+			<header>
+				<p className="text-sm text-muted-foreground">Welcome,</p>
+				<h1 className="mt-0.5 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
+					{name}!
 				</h1>
-				<p className="mt-2 text-paynes_gray-500 dark:text-french_gray-500">
+				<p className="mt-1 text-sm text-muted-foreground">
 					Welcome back. Here is the latest overview of your work.
 				</p>
-			</div>
+			</header>
 
-			<div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-				{statCards.map((stat) => (
-					<div
-						key={stat.name}
-						className="rounded-lg border border-french_gray-300 bg-white p-6 dark:border-paynes_gray-400 dark:bg-outer_space-500"
-					>
-						<div className="flex items-center gap-4">
-							<div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue_munsell-100 dark:bg-blue_munsell-900">
-								<stat.icon className="text-blue_munsell-500" size={20} />
-							</div>
-							<div>
-								<p className="text-sm text-paynes_gray-500 dark:text-french_gray-400">
-									{stat.name}
-								</p>
-								<p className="text-2xl font-semibold text-outer_space-500 dark:text-platinum-500">
-									{stat.value}
-								</p>
-							</div>
-						</div>
-					</div>
+			<div className="grid grid-cols-2 gap-3 lg:grid-cols-4 sm:gap-4">
+				{metrics.map((metric) => (
+					<MetricCard key={metric.label} {...metric} />
 				))}
 			</div>
 
-			<div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
-				<section className="rounded-lg border border-french_gray-300 bg-white p-6 dark:border-paynes_gray-400 dark:bg-outer_space-500">
-					<div className="mb-4 flex items-center justify-between">
-						<h2 className="text-lg font-semibold text-outer_space-500 dark:text-platinum-500">
-							Recent Projects
-						</h2>
-						<Link
-							href="/projects"
-							className="text-sm font-medium text-blue_munsell-600 hover:underline dark:text-blue_munsell-400"
-						>
-							View all
-						</Link>
-					</div>
-
-					{recentProjects.length > 0 ? (
-						<div className="space-y-3">
-							{recentProjects.map(
-								({ project, taskCount, completedTaskCount }) => {
-									const progress =
-										taskCount === 0
-											? 0
-											: Math.round((completedTaskCount / taskCount) * 100);
-
-									return (
-										<Link
-											key={project.id}
-											href={`/projects/${project.id}`}
-											className="group block rounded-lg border border-transparent bg-platinum-800 p-4 transition-colors hover:border-blue_munsell-500 hover:bg-platinum-600 dark:bg-outer_space-400 dark:hover:bg-paynes_gray-400"
-										>
-											<div className="flex items-start justify-between gap-4">
-												<div className="min-w-0">
-													<p className="truncate font-medium text-outer_space-500 group-hover:text-blue_munsell-600 dark:text-platinum-500">
-														{project.name}
-													</p>
-													<p className="mt-1 text-xs text-paynes_gray-500 dark:text-french_gray-400">
-														Updated {project.updatedAt.toLocaleDateString()}
-													</p>
-												</div>
-												<span
-													className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${projectStatusClasses[project.status]}`}
-												>
-													{projectStatusLabels[project.status]}
-												</span>
-											</div>
-											<div className="mt-3 flex items-center gap-3">
-												<div
-													className="h-1.5 flex-1 overflow-hidden rounded-full bg-french_gray-300 dark:bg-paynes_gray-500"
-													role="progressbar"
-													aria-label={`${project.name} progress`}
-													aria-valuenow={progress}
-													aria-valuemin={0}
-													aria-valuemax={100}
-												>
-													<div
-														className="h-full rounded-full bg-blue_munsell-500"
-														style={{ width: `${progress}%` }}
-													/>
-												</div>
-												<span className="w-9 text-right text-xs font-medium text-blue_munsell-600 dark:text-blue_munsell-400">
-													{progress}%
-												</span>
-											</div>
-										</Link>
-									);
-								},
-							)}
-						</div>
-					) : (
-						<p className="rounded-lg border border-dashed border-french_gray-300 p-8 text-center text-sm text-paynes_gray-500 dark:border-paynes_gray-400 dark:text-french_gray-400">
-							No projects to show yet.
-						</p>
-					)}
-				</section>
-
-				<section className="rounded-lg border border-french_gray-300 bg-white p-6 dark:border-paynes_gray-400 dark:bg-outer_space-500">
-					<h2 className="mb-2 text-lg font-semibold text-outer_space-500 dark:text-platinum-500">
-						Quick Actions
-					</h2>
-					<p className="mb-5 text-sm text-paynes_gray-500 dark:text-french_gray-400">
-						Start a new workspace or continue managing your existing projects.
-					</p>
-					<div className="flex flex-col items-start gap-3">
-						<CreateProjectModal teams={manageableTeams} />
-						<Link
-							href="/projects"
-							className="rounded-lg border border-french_gray-300 px-4 py-2 text-sm font-medium text-outer_space-500 transition-colors hover:bg-platinum-500 dark:border-paynes_gray-400 dark:text-platinum-500 dark:hover:bg-paynes_gray-400"
-						>
-							Manage projects
-						</Link>
-					</div>
-				</section>
+			<div className="grid gap-5 lg:grid-cols-2">
+				<DashboardQuickActions
+					createProjectAction={
+						<CreateProjectModal
+							teams={manageableTeams}
+							triggerVariant="dashboard"
+						/>
+					}
+					createTaskAction={
+						<DashboardCreateTaskModal projects={taskCreationProjects} />
+					}
+					addTeamMemberAction={<AddTeamMemberDialog teams={manageableTeams} />}
+				/>
+				<RecentProjectsPanel projects={recentProjects} />
 			</div>
 		</div>
 	);

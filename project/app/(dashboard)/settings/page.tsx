@@ -1,16 +1,16 @@
-import { SettingsContent } from "@/components/settings-content";
+import { SettingsContent } from "@/components/settings/settings-content";
 
 export default function SettingsPage() {
 	return (
-		<div className="space-y-6">
-			<div>
-				<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
-					Settings
+		<div className="w-full space-y-5">
+			<header>
+				<h1 className="font-display text-3xl font-extrabold tracking-[-0.03em] text-foreground sm:text-4xl">
+					Account &amp; security
 				</h1>
-				<p className="mt-2 text-paynes_gray-500 dark:text-french_gray-500">
-					Manage your ProjectFlow account, security, and appearance.
+				<p className="mt-1 text-sm text-muted-foreground">
+					Update your profile, sign-in methods, and active sessions.
 				</p>
-			</div>
+			</header>
 			<SettingsContent />
 		</div>
 	);

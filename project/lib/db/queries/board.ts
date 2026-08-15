@@ -7,15 +7,24 @@ import {
 import { labels, lists, projects, tasks } from "@/lib/db/schema";
 import type { TaskFilters } from "@/lib/validations";
 
+// Get the complete board for an accessible project
 export async function getProjectBoard(
 	projectId: string,
 	userId: string,
 	filters: TaskFilters = {},
 ) {
 	if (!(await canAccessProject(projectId, userId))) {
-		return null;
+		const project = await db.query.projects.findFirst({
+			columns: { id: true },
+			where: and(eq(projects.id, projectId), isNull(projects.deletedAt)),
+		});
+
+		return project
+			? ({ status: "forbidden" } as const)
+			: ({ status: "not_found" } as const);
 	}
 
+	// Build optional task filters from the current search controls
 	const search = filters.q ? `%${filters.q}%` : undefined;
 	const taskConditions = [
 		isNull(tasks.deletedAt),
@@ -32,6 +41,7 @@ export async function getProjectBoard(
 			: undefined,
 	];
 
+	// Load the board and the user's project role
 	const [project, membership] = await Promise.all([
 		db.query.projects.findFirst({
 			where: eq(projects.id, projectId),
@@ -62,9 +72,10 @@ export async function getProjectBoard(
 		getProjectMembership(projectId, userId),
 	]);
 
+	// Deleted projects
 	if (!project || project.deletedAt) {
-		return null;
+		return { status: "not_found" } as const;
 	}
 
-	return { project, membership };
+	return { status: "ok", project, membership } as const;
 }

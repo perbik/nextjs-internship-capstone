@@ -15,6 +15,7 @@ import {
 } from "@/lib/db/schema";
 import type { BulkTaskOperation } from "@/lib/validations";
 
+// Show a member's name or use their email as a fallback
 function displayName(user: {
 	firstName: string | null;
 	lastName: string | null;
@@ -25,6 +26,7 @@ function displayName(user: {
 	);
 }
 
+// Apply one operation to several authorized tasks
 export async function bulkUpdateTasks(
 	userId: string,
 	input: BulkTaskOperation,
@@ -39,11 +41,13 @@ export async function bulkUpdateTasks(
 		throw new Error("DATABASE_URL is required");
 	}
 
+	// Use the WebSocket driver because this operation needs a transaction
 	const pool = new Pool({ connectionString: databaseUrl });
 	const transactionDb = drizzle({ client: pool, schema });
 
 	try {
 		await transactionDb.transaction(async (tx) => {
+			// Prevent two board updates from changing the same project together
 			await tx.execute(
 				sql`select pg_advisory_xact_lock(hashtextextended(${input.projectId}, 0))`,
 			);
@@ -67,6 +71,7 @@ export async function bulkUpdateTasks(
 					),
 				);
 
+			// Confirm every submitted task still belongs to this project
 			if (
 				selectedTasks.length !== input.taskIds.length ||
 				new Set(input.taskIds).size !== input.taskIds.length
@@ -83,6 +88,7 @@ export async function bulkUpdateTasks(
 			);
 			const now = new Date();
 
+			// Move selected tasks to one project column
 			if (input.operation === "move") {
 				const [targetList] = await tx
 					.select({
@@ -147,6 +153,7 @@ export async function bulkUpdateTasks(
 				}
 			}
 
+			// Change priority only for tasks with a different value
 			if (input.operation === "priority") {
 				const changedTasks = selectedTasks.filter(
 					(task) => task.priority !== input.value,
@@ -178,6 +185,7 @@ export async function bulkUpdateTasks(
 				}
 			}
 
+			// Assign or unassign the selected tasks
 			if (input.operation === "assign") {
 				const assigneeId = input.value === "unassigned" ? null : input.value;
 				let nextAssigneeName: string | null = null;
@@ -266,6 +274,7 @@ export async function bulkUpdateTasks(
 				}
 			}
 
+			// Add or remove one valid project label
 			if (
 				input.operation === "add_label" ||
 				input.operation === "remove_label"
@@ -343,6 +352,7 @@ export async function bulkUpdateTasks(
 				}
 			}
 
+			// Mark the project as recently updated
 			await tx
 				.update(projects)
 				.set({ updatedAt: now })

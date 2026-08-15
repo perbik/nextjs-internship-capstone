@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/schema";
 import type { ProjectCreateData } from "@/lib/validations";
 
+// Every new project starts with these Kanban columns
 const defaultLists = [
 	{ name: "To Do", position: 0, isCompleted: false },
 	{ name: "In Progress", position: 1, isCompleted: false },
@@ -18,6 +19,7 @@ const defaultLists = [
 	{ name: "Done", position: 3, isCompleted: true },
 ] as const;
 
+// Create a team project, its owner membership, and default columns
 export async function createProject(ownerId: string, data: ProjectCreateData) {
 	const [team] = await db
 		.select({ role: teamMembers.role })
@@ -65,10 +67,12 @@ export async function createProject(ownerId: string, data: ProjectCreateData) {
 	return projectId;
 }
 
+// Fields that can be updated without the ownership
 type ProjectUpdate = Partial<
 	Pick<Project, "name" | "description" | "status" | "dueDate">
 >;
 
+// Update an active project when the user can manage it
 export async function updateProject(
 	projectId: string,
 	userId: string,
@@ -91,6 +95,7 @@ export async function updateProject(
 	return project;
 }
 
+// Hide a project without removing its database record - preparation for potential archival or restoration
 export async function softDeleteProject(projectId: string, userId: string) {
 	const [project] = await db
 		.select({ ownerId: projects.ownerId })
@@ -111,47 +116,5 @@ export async function softDeleteProject(projectId: string, userId: string) {
 	await db
 		.update(projects)
 		.set({ deletedAt: now, updatedAt: now })
-		.where(eq(projects.id, projectId));
-}
-
-export async function assignProjectToTeam(
-	projectId: string,
-	ownerId: string,
-	teamId: string,
-) {
-	const [project] = await db
-		.select({ ownerId: projects.ownerId, teamId: projects.teamId })
-		.from(projects)
-		.where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
-		.limit(1);
-	if (!project || project.ownerId !== ownerId) {
-		throw new Error("Only the project owner can assign its team");
-	}
-	if (project.teamId) {
-		throw new Error("This project is already assigned to a team");
-	}
-
-	const [membership] = await db
-		.select({ role: teamMembers.role })
-		.from(teamMembers)
-		.innerJoin(teams, eq(teamMembers.teamId, teams.id))
-		.where(
-			and(
-				eq(teamMembers.teamId, teamId),
-				eq(teamMembers.userId, ownerId),
-				isNull(teams.deletedAt),
-			),
-		)
-		.limit(1);
-	if (
-		!membership ||
-		(membership.role !== "owner" && membership.role !== "admin")
-	) {
-		throw new Error("You must own or administer the selected team");
-	}
-
-	await db
-		.update(projects)
-		.set({ teamId, updatedAt: new Date() })
 		.where(eq(projects.id, projectId));
 }

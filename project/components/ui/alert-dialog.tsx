@@ -14,16 +14,12 @@ const AlertDialogPortal = AlertDialogPrimitive.Portal;
 const AlertDialogOverlay = React.forwardRef<
 	React.ElementRef<typeof AlertDialogPrimitive.Overlay>,
 	React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Overlay>
->(({ className, onClick, onPointerDown, ...props }, ref) => (
+>(({ className, onClick, ...props }, ref) => (
 	<AlertDialogPrimitive.Overlay
 		className={cn(
 			"fixed inset-0 z-50 bg-black/55 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
 			className,
 		)}
-		onPointerDown={(event) => {
-			onPointerDown?.(event);
-			event.stopPropagation();
-		}}
 		onClick={(event) => {
 			onClick?.(event);
 			event.stopPropagation();
@@ -37,7 +33,7 @@ AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
 const AlertDialogContent = React.forwardRef<
 	React.ElementRef<typeof AlertDialogPrimitive.Content>,
 	React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, onClick, onPointerDown, ...props }, ref) => (
+>(({ className, onClick, ...props }, ref) => (
 	<AlertDialogPortal>
 		<AlertDialogOverlay />
 		<AlertDialogPrimitive.Content
@@ -46,10 +42,6 @@ const AlertDialogContent = React.forwardRef<
 				"fixed left-[50%] top-[50%] z-50 grid w-[calc(100%-2rem)] max-w-md translate-x-[-50%] translate-y-[-50%] gap-5 rounded-2xl border border-border bg-card p-6 text-foreground shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95   ",
 				className,
 			)}
-			onPointerDown={(event) => {
-				onPointerDown?.(event);
-				event.stopPropagation();
-			}}
 			onClick={(event) => {
 				onClick?.(event);
 				event.stopPropagation();

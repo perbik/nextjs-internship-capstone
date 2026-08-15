@@ -2,26 +2,32 @@
 
 import { LoaderCircle, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { Input } from "@/components/ui/input";
 
-interface DebouncedSearchInputProps {
+interface SearchBarProps {
 	initialValue?: string;
 	placeholder: string;
 	maxLength: number;
 	accessibleLabel: string;
 	variant?: "default" | "pill";
+	resetParams?: string[];
 }
 
-export function DebouncedSearchInput({
+const EMPTY_RESET_PARAMS: string[] = [];
+
+export function SearchBar({
 	initialValue = "",
 	placeholder,
 	maxLength,
 	accessibleLabel,
 	variant = "default",
-}: DebouncedSearchInputProps) {
+	resetParams = EMPTY_RESET_PARAMS,
+}: SearchBarProps) {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
+	const inputId = useId();
 	const [value, setValue] = useState(initialValue);
 	const [isPending, startTransition] = useTransition();
 	const lastSubmittedQuery = useRef(initialValue);
@@ -51,6 +57,7 @@ export function DebouncedSearchInput({
 			} else {
 				nextParams.delete("q");
 			}
+			for (const param of resetParams) nextParams.delete(param);
 
 			lastSubmittedQuery.current = nextQuery;
 			const query = nextParams.toString();
@@ -62,33 +69,32 @@ export function DebouncedSearchInput({
 		}, 350);
 
 		return () => window.clearTimeout(timeout);
-	}, [pathname, router, searchParams, value]);
+	}, [pathname, resetParams, router, searchParams, value]);
 
 	return (
-		<label className="relative block">
+		<label htmlFor={inputId} className="relative block">
 			<span className="sr-only">{accessibleLabel}</span>
 			<Search
 				size={17}
-				className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-paynes_gray-500 dark:text-french_gray-400"
+				className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground"
 			/>
-			<input
+			<Input
+				id={inputId}
 				type="search"
 				name="q"
 				maxLength={maxLength}
 				value={value}
 				onChange={(event) => setValue(event.target.value)}
 				placeholder={placeholder}
-				className={`w-full border bg-card py-2 pl-10 pr-10 text-sm text-outer_space-500 focus:outline-none focus:ring-2 focus:ring-brand/30 dark:bg-outer_space-400 dark:text-platinum-500 ${
-					variant === "pill"
-						? "h-11 rounded-full border-border"
-						: "rounded-lg border-french_gray-300 dark:border-paynes_gray-400"
+				className={`w-full bg-card py-2 pl-10 pr-10 text-sm text-foreground focus-visible:ring-brand/30 ${
+					variant === "pill" ? "h-11 rounded-full" : "rounded-lg"
 				}`}
 			/>
 			{isPending && (
 				<LoaderCircle
 					size={17}
 					aria-label="Updating search results"
-					className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-blue_munsell-500"
+					className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-brand"
 				/>
 			)}
 		</label>

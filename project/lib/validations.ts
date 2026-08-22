@@ -6,21 +6,21 @@ import {
 } from "@/lib/db/schema";
 
 // Values from the db that keep validation aligned with the persisted enums
-const PROJECT_STATUSES = projectStatus.enumValues;
-const PROJECT_ROLES = projectMemberRole.enumValues;
-const TASK_PRIORITIES = taskPriority.enumValues;
+export const PROJECT_STATUSES = projectStatus.enumValues;
+export const PROJECT_ROLES = projectMemberRole.enumValues;
+export const TASK_PRIORITIES = taskPriority.enumValues;
 
-const MANAGEABLE_MEMBER_ROLES = ["admin", "member"] as const;
+export const MANAGEABLE_MEMBER_ROLES = ["admin", "member"] as const;
 
 // Shared form-field validation
-const requiredText = (field: string, maximum: number) =>
+export const requiredText = (field: string, maximum: number) =>
 	z
 		.string({ error: `${field} must be text` })
 		.trim()
 		.min(1, `${field} is required`)
 		.max(maximum, `${field} must be ${maximum} characters or fewer`);
 
-const optionalText = (field: string, maximum: number) =>
+export const optionalText = (field: string, maximum: number) =>
 	z.preprocess(
 		(value) =>
 			typeof value === "string" && value.trim() === "" ? undefined : value,
@@ -31,19 +31,19 @@ const optionalText = (field: string, maximum: number) =>
 			.optional(),
 	);
 
-const optionalUuid = (field: string) =>
+export const optionalUuid = (field: string) =>
 	z.preprocess(
 		(value) => (value === "" || value === null ? undefined : value),
 		z.uuid(`${field} must be a valid ID`).optional(),
 	);
 
-const optionalDate = (field: string) =>
+export const optionalDate = (field: string) =>
 	z.preprocess(
 		(value) => (value === "" || value === null ? undefined : value),
 		z.coerce.date({ error: `${field} must be a valid date` }).optional(),
 	);
 
-const optionalPosition = z.preprocess(
+export const optionalPosition = z.preprocess(
 	(value) => (value === "" || value === null ? undefined : value),
 	z.coerce
 		.number({ error: "Position must be a number" })
@@ -57,7 +57,7 @@ const hasUpdate = (data: Record<string, unknown>) =>
 	Object.values(data).some((value) => value !== undefined);
 
 // Date-only deadlines are compared by calendar day so today remains valid
-const futureOptionalDate = (field: string) =>
+export const futureOptionalDate = (field: string) =>
 	optionalDate(field).refine(
 		(date) => {
 			if (!date) return true;
@@ -120,7 +120,7 @@ export const taskSchema = z.object({
 	assigneeId: optionalUuid("Assignee"),
 	labelIds: z
 		.array(z.uuid("Label must be a valid ID"))
-		.max(10, "A task can have at most 10 labels")
+		.max(5, "A task can have at most 5 labels")
 		.default([]),
 });
 
@@ -131,7 +131,15 @@ export const taskCreateSchema = taskSchema.extend({
 
 export const taskUpdateSchema = taskCreateSchema
 	.partial()
-	.refine(hasUpdate, { message: "At least one task field is required" });
+	.extend({
+		labelIds: z
+			.array(z.uuid("Label must be a valid ID"))
+			.max(5, "A task can have at most 5 labels")
+			.optional(),
+	})
+	.refine(hasUpdate, {
+		message: "At least one task field is required",
+	});
 
 export const taskFilterSchema = z.object({
 	q: optionalText("Search", 200).catch(undefined),

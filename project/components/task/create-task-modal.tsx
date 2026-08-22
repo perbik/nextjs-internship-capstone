@@ -158,7 +158,7 @@ function TaskModal({
 		? `edit-task:${task?.id}`
 		: projectOptions
 			? "create-task:project-picker"
-			: `create-task:${initialListId ?? "default"}`;
+			: `create-task:${initialListId ?? "default"}:${triggerVariant}`;
 	const activeModalId = useUIStore((state) => state.activeModalId);
 	const openModal = useUIStore((state) => state.openModal);
 	const closeModal = useUIStore((state) => state.closeModal);

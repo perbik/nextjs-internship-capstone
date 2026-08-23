@@ -82,10 +82,13 @@ export function TeamMemberControls({
 	if (!canChange && !canRemove) return null;
 
 	return (
-		<div className="shrink-0 space-y-2">
-			<div className="flex flex-wrap items-center gap-2">
+		<div className="w-full shrink-0 space-y-2 sm:w-auto">
+			<div className="flex min-w-0 items-center gap-2">
 				{canChange && (
-					<form action={roleAction} className="flex items-center gap-2">
+					<form
+						action={roleAction}
+						className="flex min-w-0 flex-1 items-center gap-2"
+					>
 						<input type="hidden" name="teamId" value={team.id} />
 						<input type="hidden" name="userId" value={member.id} />
 						<input type="hidden" name="role" value={role} />
@@ -93,7 +96,7 @@ export function TeamMemberControls({
 							value={role}
 							onValueChange={(value) => setRole(value as typeof role)}
 						>
-							<SelectTrigger className="h-9 w-28">
+							<SelectTrigger className="h-9 min-w-0 flex-1 sm:w-28">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>

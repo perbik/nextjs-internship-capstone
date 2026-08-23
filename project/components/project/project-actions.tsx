@@ -84,7 +84,11 @@ export function ProjectActions({
 
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
-			<div className="flex items-center gap-2">
+			<div
+				className={
+					variant === "manage" ? "w-full lg:w-auto" : "flex items-center gap-2"
+				}
+			>
 				{canManage && (
 					<Button
 						type="button"
@@ -93,7 +97,9 @@ export function ProjectActions({
 						onClick={() => setIsOpen(true)}
 						aria-label={`Edit ${project.name}`}
 						className={
-							variant === "compact" ? "size-9" : "h-9 rounded-full px-5"
+							variant === "compact"
+								? "size-9"
+								: "h-9 w-full rounded-full px-3 lg:w-auto lg:px-5"
 						}
 					>
 						<Pencil aria-hidden="true" />

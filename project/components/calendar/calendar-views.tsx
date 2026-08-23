@@ -42,15 +42,15 @@ export function MonthCalendarView({
 
 	return (
 		<section
-			className="overflow-x-auto px-5 py-2 lg:px-6"
+			className="min-w-0 overflow-hidden px-2 py-2 sm:px-5 lg:px-6"
 			aria-label={anchor.toLocaleDateString("en-US", {
 				month: "long",
 				year: "numeric",
 				timeZone: "UTC",
 			})}
 		>
-			<WeekdayHeader />
-			<div className="grid min-w-3xl grid-cols-7 auto-rows-15.75 pt-1">
+			<WeekdayHeader compact />
+			<div className="grid min-w-0 grid-cols-7 auto-rows-15.75 pt-1">
 				{days.map((date) => {
 					const key = dateKey(date);
 					const isToday = key === todayKey;
@@ -58,7 +58,10 @@ export function MonthCalendarView({
 						date.getUTCMonth() === anchor.getUTCMonth() &&
 						date.getUTCFullYear() === anchor.getUTCFullYear();
 					return (
-						<div key={key} className="min-w-0 rounded-lg p-1">
+						<div
+							key={key}
+							className="min-w-0 overflow-hidden rounded-lg px-0.5 py-1 sm:p-1"
+						>
 							<Link
 								href={calendarHref("day", date)}
 								aria-current={isToday ? "date" : undefined}
@@ -122,13 +125,26 @@ export function WeekCalendarView({
 	);
 }
 
-function WeekdayHeader({ dates, today }: { dates?: Date[]; today?: Date }) {
+function WeekdayHeader({
+	dates,
+	today,
+	compact = false,
+}: {
+	dates?: Date[];
+	today?: Date;
+	compact?: boolean;
+}) {
 	return (
-		<div className="grid min-w-3xl grid-cols-7 border-b border-border pb-2">
+		<div
+			className={cn(
+				"grid grid-cols-7 border-b border-border pb-2",
+				compact ? "min-w-0" : "min-w-3xl",
+			)}
+		>
 			{WEEKDAY_LABELS.map((weekday, index) => (
 				<div
 					key={weekday}
-					className="text-center text-sm font-semibold text-muted-foreground"
+					className="min-w-0 text-center text-xs font-semibold text-muted-foreground sm:text-sm"
 				>
 					{weekday}
 					{dates && (

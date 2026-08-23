@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
 	Pagination,
 	PaginationContent,
@@ -54,8 +55,35 @@ export function ProjectPagination({
 
 	return (
 		<Pagination className="m-0 w-auto justify-end">
-			<PaginationContent>
-				<PaginationItem>
+			<PaginationContent className="gap-0.5 sm:gap-1">
+				<PaginationItem className="sm:hidden">
+					<PaginationLink
+						href={projectPageHref(page - 1, filters)}
+						disabled={page === 1}
+						size="icon"
+						aria-label="Previous project page"
+						className="size-8"
+					>
+						<ChevronLeft aria-hidden="true" />
+					</PaginationLink>
+				</PaginationItem>
+				<PaginationItem className="sm:hidden">
+					<span className="px-2 text-xs font-semibold text-muted-foreground">
+						{page} / {totalPages}
+					</span>
+				</PaginationItem>
+				<PaginationItem className="sm:hidden">
+					<PaginationLink
+						href={projectPageHref(page + 1, filters)}
+						disabled={page === totalPages}
+						size="icon"
+						aria-label="Next project page"
+						className="size-8"
+					>
+						<ChevronRight aria-hidden="true" />
+					</PaginationLink>
+				</PaginationItem>
+				<PaginationItem className="hidden sm:block">
 					<PaginationPrevious
 						href={projectPageHref(page - 1, filters)}
 						disabled={page === 1}
@@ -65,7 +93,7 @@ export function ProjectPagination({
 				</PaginationItem>
 				{visiblePages(page, totalPages).map((item) =>
 					typeof item === "number" ? (
-						<PaginationItem key={item}>
+						<PaginationItem key={item} className="hidden sm:block">
 							<PaginationLink
 								href={projectPageHref(item, filters)}
 								isActive={item === page}
@@ -77,12 +105,12 @@ export function ProjectPagination({
 							</PaginationLink>
 						</PaginationItem>
 					) : (
-						<PaginationItem key={item}>
+						<PaginationItem key={item} className="hidden sm:block">
 							<PaginationEllipsis />
 						</PaginationItem>
 					),
 				)}
-				<PaginationItem>
+				<PaginationItem className="hidden sm:block">
 					<PaginationNext
 						href={projectPageHref(page + 1, filters)}
 						disabled={page === totalPages}

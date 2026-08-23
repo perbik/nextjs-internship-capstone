@@ -92,15 +92,25 @@ export function KanbanBoard({
 			onDragCancel={handleDragCancel}
 		>
 			<div className="min-w-0 max-w-full overflow-hidden rounded-2xl bg-board">
-				<div className="flex min-h-17 flex-wrap items-center justify-between gap-3 px-5 py-4">
-					<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-						{filterControl}
-						<BulkTaskToolbar
-							projectId={projectId}
-							lists={boardLists}
-							members={members}
-							labels={labels}
-						/>
+				<div className="flex min-h-17 flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
+					<div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+						<div className="min-w-0 flex-1">{filterControl}</div>
+						<div className="flex items-center gap-2">
+							<BulkTaskToolbar
+								projectId={projectId}
+								lists={boardLists}
+								members={members}
+								labels={labels}
+							/>
+							{canManage && (
+								<CreateListDialog
+									projectId={projectId}
+									action={createAction}
+									state={createState}
+									isPending={isCreating}
+								/>
+							)}
+						</div>
 						<BoardStatus
 							dragEnabled={dragEnabled}
 							isMoving={isSavingBoardPosition}
@@ -108,14 +118,6 @@ export function KanbanBoard({
 							listMoveError={listMoveError}
 						/>
 					</div>
-					{canManage && (
-						<CreateListDialog
-							projectId={projectId}
-							action={createAction}
-							state={createState}
-							isPending={isCreating}
-						/>
-					)}
 				</div>
 				<div className="kanban-scrollbar flex h-127 w-full min-w-0 items-start gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain px-5 pb-5">
 					<SortableContext

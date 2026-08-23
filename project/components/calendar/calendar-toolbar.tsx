@@ -37,8 +37,8 @@ export function CalendarToolbar({
 	const title = calendarHeading(view, anchor, rangeStart);
 
 	return (
-		<header className="flex flex-col gap-4 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
-			<div className="flex items-center gap-3">
+		<header className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+			<div className="flex min-w-0 items-center justify-between gap-2 sm:justify-start sm:gap-3">
 				<Tooltip>
 					<TooltipTrigger asChild>
 						<Button
@@ -57,7 +57,7 @@ export function CalendarToolbar({
 					</TooltipTrigger>
 					<TooltipContent>Previous {view}</TooltipContent>
 				</Tooltip>
-				<h2 className="font-display text-xl font-bold tracking-[-0.02em] text-foreground sm:text-2xl">
+				<h2 className="min-w-0 flex-1 truncate text-center font-display text-xl font-bold tracking-[-0.02em] text-foreground sm:flex-none sm:text-left sm:text-2xl">
 					{title.primary} <span className="text-brand">{title.accent}</span>
 				</h2>
 				<Tooltip>
@@ -77,11 +77,11 @@ export function CalendarToolbar({
 				</Tooltip>
 			</div>
 
-			<div className="flex flex-wrap items-center gap-2">
+			<div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-[auto_1fr] min-[360px]:items-center sm:flex sm:flex-wrap">
 				{addTaskAction}
 				<nav
 					aria-label="Calendar view"
-					className="flex items-center rounded-lg border border-border bg-muted p-1"
+					className="grid grid-cols-3 items-center rounded-lg border border-border bg-muted p-1"
 				>
 					{CALENDAR_VIEWS.map((option) => (
 						<Button

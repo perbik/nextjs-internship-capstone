@@ -1,4 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
+import { syncClerkBackendUser } from "@/lib/auth/sync-clerk-user";
 import { getUserByClerkId } from "@/lib/db/queries";
 
 export async function requireCurrentUser() {
@@ -10,9 +11,17 @@ export async function requireCurrentUser() {
 
 	const user = await getUserByClerkId(clerkId);
 
-	if (!user) {
-		throw new Error("Your Brix account is not synchronized yet");
+	if (user) {
+		return user;
 	}
 
-	return user;
+	try {
+		// Repair a missing Neon user when the signup webhook has not arrived yet
+		const clerk = await clerkClient();
+		const clerkUser = await clerk.users.getUser(clerkId);
+		return await syncClerkBackendUser(clerkUser);
+	} catch (error) {
+		console.error("Failed to provision the current Brix user", error);
+		throw new Error("Unable to prepare your Brix account");
+	}
 }

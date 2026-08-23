@@ -37,6 +37,15 @@ export const teamMemberRole = pgEnum("team_member_role", [
 
 export const taskPriority = pgEnum("task_priority", ["low", "medium", "high"]);
 
+// Events that can appear in a user's notification inbox
+export const notificationType = pgEnum("notification_type", [
+	"team_member_added",
+	"project_member_added",
+	"task_assigned",
+	"task_completed",
+	"task_commented",
+]);
+
 // User and project tables
 export const users = pgTable("users", {
 	id: uuid("id").defaultRandom().primaryKey(),
@@ -295,6 +304,45 @@ export const activityLogs = pgTable(
 	],
 );
 
+// Private notifications are stored for one recipient and may link to related content
+export const notifications = pgTable(
+	"notifications",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		recipientId: uuid("recipient_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		actorId: uuid("actor_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		type: notificationType("type").notNull(),
+		teamId: uuid("team_id").references(() => teams.id, {
+			onDelete: "set null",
+		}),
+		projectId: uuid("project_id").references(() => projects.id, {
+			onDelete: "set null",
+		}),
+		taskId: uuid("task_id").references(() => tasks.id, {
+			onDelete: "set null",
+		}),
+		message: text("message").notNull(),
+		readAt: timestamp("read_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		index("notifications_recipient_created_at_idx").on(
+			table.recipientId,
+			table.createdAt,
+		),
+		index("notifications_recipient_read_at_idx").on(
+			table.recipientId,
+			table.readAt,
+		),
+	],
+);
+
 // One user to many projects, teams, memberships, tasks, comments, and activities
 export const usersRelations = relations(users, ({ many }) => ({
 	ownedProjects: many(projects),
@@ -304,6 +352,12 @@ export const usersRelations = relations(users, ({ many }) => ({
 	assignedTasks: many(tasks),
 	comments: many(comments),
 	activities: many(activityLogs),
+	receivedNotifications: many(notifications, {
+		relationName: "notificationRecipient",
+	}),
+	createdNotifications: many(notifications, {
+		relationName: "notificationActor",
+	}),
 }));
 
 // Many projects to one owner and team; one project to many members, lists, labels, and activities
@@ -320,6 +374,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
 	lists: many(lists),
 	labels: many(labels),
 	activities: many(activityLogs),
+	notifications: many(notifications),
 }));
 
 // Many teams to one owner; one team to many members and projects
@@ -330,6 +385,7 @@ export const teamsRelations = relations(teams, ({ one, many }) => ({
 	}),
 	members: many(teamMembers),
 	projects: many(projects),
+	notifications: many(notifications),
 }));
 
 // Many team memberships to one team and one user
@@ -387,6 +443,7 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
 	comments: many(comments),
 	taskLabels: many(taskLabels),
 	activities: many(activityLogs),
+	notifications: many(notifications),
 }));
 
 // Many task-label records to one task and one label
@@ -429,6 +486,32 @@ export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
 	}),
 }));
 
+// Each notification belongs to one recipient and may reference its actor and content
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+	recipient: one(users, {
+		fields: [notifications.recipientId],
+		references: [users.id],
+		relationName: "notificationRecipient",
+	}),
+	actor: one(users, {
+		fields: [notifications.actorId],
+		references: [users.id],
+		relationName: "notificationActor",
+	}),
+	team: one(teams, {
+		fields: [notifications.teamId],
+		references: [teams.id],
+	}),
+	project: one(projects, {
+		fields: [notifications.projectId],
+		references: [projects.id],
+	}),
+	task: one(tasks, {
+		fields: [notifications.taskId],
+		references: [tasks.id],
+	}),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Project = typeof projects.$inferSelect;
@@ -451,3 +534,5 @@ export type Comment = typeof comments.$inferSelect;
 export type NewComment = typeof comments.$inferInsert;
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type NewActivityLog = typeof activityLogs.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;

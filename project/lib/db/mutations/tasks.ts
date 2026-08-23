@@ -3,6 +3,7 @@ import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { db } from "@/lib/db";
 import { recordTaskActivity } from "@/lib/db/mutations/activities";
+import { createNotification } from "@/lib/db/mutations/notifications";
 import { canAccessProject } from "@/lib/db/queries/project-members";
 import * as schema from "@/lib/db/schema";
 import {
@@ -161,6 +162,14 @@ export async function createTask(userId: string, data: TaskMutationData) {
 			listCompleted: list.isCompleted,
 		},
 	});
+	await createNotification({
+		recipientId: task.assigneeId,
+		actorId: userId,
+		type: "task_assigned",
+		projectId: list.projectId,
+		taskId: task.id,
+		message: `assigned you to ${task.title}`,
+	});
 	return { task, projectId: list.projectId };
 }
 
@@ -175,6 +184,7 @@ export async function updateTask(
 			task: tasks,
 			projectId: lists.projectId,
 			listName: lists.name,
+			listCompleted: lists.isCompleted,
 		})
 		.from(tasks)
 		.innerJoin(lists, eq(tasks.listId, lists.id))
@@ -372,6 +382,32 @@ export async function updateTask(
 			},
 		});
 	}
+
+	if (currentTask.task.assigneeId !== task.assigneeId) {
+		await createNotification({
+			recipientId: task.assigneeId,
+			actorId: userId,
+			type: "task_assigned",
+			projectId: currentTask.projectId,
+			taskId,
+			message: `assigned you to ${task.title}`,
+		});
+	}
+
+	if (
+		!currentTask.listCompleted &&
+		targetList.isCompleted &&
+		data.listId !== currentTask.task.listId
+	) {
+		await createNotification({
+			recipientId: task.assigneeId,
+			actorId: userId,
+			type: "task_completed",
+			projectId: currentTask.projectId,
+			taskId,
+			message: `completed ${task.title}`,
+		});
+	}
 	return { task, projectId: currentTask.projectId };
 }
 
@@ -517,6 +553,7 @@ export async function saveBoardLayout(
 					listId: tasks.listId,
 					position: tasks.position,
 					title: tasks.title,
+					assigneeId: tasks.assigneeId,
 				})
 				.from(tasks)
 				.innerJoin(lists, eq(tasks.listId, lists.id))
@@ -584,6 +621,32 @@ export async function saveBoardLayout(
 
 			if (activityValues.length > 0) {
 				await tx.insert(activityLogs).values(activityValues);
+			}
+
+			for (const list of layout) {
+				for (const taskId of list.taskIds) {
+					const current = currentTasks.get(taskId);
+					if (
+						!current ||
+						current.listId === list.id ||
+						completedLists.get(current.listId) ||
+						!completedLists.get(list.id)
+					) {
+						continue;
+					}
+
+					await createNotification(
+						{
+							recipientId: current.assigneeId,
+							actorId: userId,
+							type: "task_completed",
+							projectId,
+							taskId,
+							message: `completed ${current.title}`,
+						},
+						tx,
+					);
+				}
 			}
 
 			await tx

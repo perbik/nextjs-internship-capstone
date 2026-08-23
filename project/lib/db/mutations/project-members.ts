@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { createNotification } from "@/lib/db/mutations/notifications";
 import {
 	lists,
 	projectMembers,
@@ -18,6 +19,7 @@ async function requireManagementContext(projectId: string, actorId: string) {
 		.select({
 			ownerId: projects.ownerId,
 			teamId: projects.teamId,
+			projectName: projects.name,
 			actorRole: projectMembers.role,
 		})
 		.from(projects)
@@ -90,11 +92,23 @@ export async function addProjectMember(
 		throw new Error("This user is already a project member");
 	}
 
-	await db.insert(projectMembers).values({ projectId, userId, role });
-	await db
-		.update(projects)
-		.set({ updatedAt: new Date() })
-		.where(eq(projects.id, projectId));
+	await withTransaction(async (tx) => {
+		await tx.insert(projectMembers).values({ projectId, userId, role });
+		await createNotification(
+			{
+				recipientId: userId,
+				actorId,
+				type: "project_member_added",
+				projectId,
+				message: `added you to ${context.projectName}`,
+			},
+			tx,
+		);
+		await tx
+			.update(projects)
+			.set({ updatedAt: new Date() })
+			.where(eq(projects.id, projectId));
+	});
 
 	return userId;
 }

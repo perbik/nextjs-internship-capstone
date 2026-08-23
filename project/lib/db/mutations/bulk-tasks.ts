@@ -1,6 +1,7 @@
 import { Pool } from "@neondatabase/serverless";
 import { and, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-serverless";
+import { createNotification } from "@/lib/db/mutations/notifications";
 import { canAccessProject } from "@/lib/db/queries/project-members";
 import * as schema from "@/lib/db/schema";
 import {
@@ -113,11 +114,18 @@ export async function bulkUpdateTasks(
 					...new Set(selectedTasks.map(({ listId }) => listId)),
 				];
 				const sourceLists = await tx
-					.select({ id: lists.id, name: lists.name })
+					.select({
+						id: lists.id,
+						name: lists.name,
+						isCompleted: lists.isCompleted,
+					})
 					.from(lists)
 					.where(inArray(lists.id, sourceListIds));
 				const listNames = new Map(
 					sourceLists.map(({ id, name }) => [id, name]),
+				);
+				const completedLists = new Map(
+					sourceLists.map(({ id, isCompleted }) => [id, isCompleted]),
 				);
 				const [positionResult] = await tx
 					.select({ position: max(tasks.position) })
@@ -150,6 +158,19 @@ export async function bulkUpdateTasks(
 							toListCompleted: targetList.isCompleted,
 						},
 					});
+					if (!completedLists.get(task.listId) && targetList.isCompleted) {
+						await createNotification(
+							{
+								recipientId: task.assigneeId,
+								actorId: userId,
+								type: "task_completed",
+								projectId: input.projectId,
+								taskId: task.id,
+								message: `completed ${task.title}`,
+							},
+							tx,
+						);
+					}
 				}
 			}
 
@@ -271,6 +292,21 @@ export async function bulkUpdateTasks(
 							},
 						})),
 					);
+					if (assigneeId) {
+						for (const task of changedTasks) {
+							await createNotification(
+								{
+									recipientId: assigneeId,
+									actorId: userId,
+									type: "task_assigned",
+									projectId: input.projectId,
+									taskId: task.id,
+									message: `assigned you to ${task.title}`,
+								},
+								tx,
+							);
+						}
+					}
 				}
 			}
 

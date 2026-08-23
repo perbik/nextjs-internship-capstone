@@ -14,6 +14,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
+import { NotificationCenter } from "@/components/notifications/notification-center";
+import type { NotificationSummary } from "@/components/notifications/types";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,7 +79,13 @@ function SidebarContent({
 	);
 }
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+export function DashboardLayout({
+	children,
+	notifications,
+}: {
+	children: React.ReactNode;
+	notifications: NotificationSummary;
+}) {
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const pathname = usePathname();
 	const activeItem =
@@ -122,13 +130,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 						{activeItem.name}
 					</span>
 					<div className="flex items-center gap-2">
+						<NotificationCenter summary={notifications} />
 						<ThemeToggle />
 						<UserButton />
 					</div>
 				</header>
 
 				<main className="min-w-0 overflow-x-hidden px-4 pt-6 sm:px-6">
-					<div className="mx-auto w-full min-w-0 max-w-[90rem]">{children}</div>
+					<div className="mx-auto w-full min-w-0 max-w-360">{children}</div>
 				</main>
 			</div>
 		</div>

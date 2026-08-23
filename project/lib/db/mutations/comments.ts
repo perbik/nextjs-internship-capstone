@@ -1,6 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { recordTaskActivity } from "@/lib/db/mutations/activities";
+import { createNotification } from "@/lib/db/mutations/notifications";
 import { canAccessProject } from "@/lib/db/queries/project-members";
 import { comments, lists, tasks } from "@/lib/db/schema";
 import { withTransaction } from "@/lib/db/transaction";
@@ -12,6 +13,7 @@ async function requireAccessibleTask(taskId: string, userId: string) {
 			id: tasks.id,
 			title: tasks.title,
 			projectId: lists.projectId,
+			assigneeId: tasks.assigneeId,
 		})
 		.from(tasks)
 		.innerJoin(lists, eq(tasks.listId, lists.id))
@@ -45,6 +47,17 @@ export async function createComment(
 			action: "comment_added",
 			database: tx,
 		});
+		await createNotification(
+			{
+				recipientId: task.assigneeId,
+				actorId: authorId,
+				type: "task_commented",
+				projectId: task.projectId,
+				taskId,
+				message: `commented on ${task.title}`,
+			},
+			tx,
+		);
 
 		return comment;
 	});

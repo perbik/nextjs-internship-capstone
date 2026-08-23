@@ -43,6 +43,13 @@
 			"when": 1785421164323,
 			"tag": "20260730141924_create_team_project_collaboration_flow",
 			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "7",
+			"when": 1787461222771,
+			"tag": "20260823050022_add_in_app_notifications",
+			"breakpoints": true
 		}
 	]
 }

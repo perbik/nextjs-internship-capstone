@@ -1,5 +1,6 @@
 import { and, eq, ilike, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { createNotification } from "@/lib/db/mutations/notifications";
 import {
 	lists,
 	projectMembers,
@@ -17,7 +18,11 @@ type MemberRole = "admin" | "member";
 // Require the current user to be a team owner or admin
 async function requireManager(teamId: string, actorId: string) {
 	const [context] = await db
-		.select({ ownerId: teams.ownerId, actorRole: teamMembers.role })
+		.select({
+			ownerId: teams.ownerId,
+			actorRole: teamMembers.role,
+			teamName: teams.name,
+		})
 		.from(teams)
 		.innerJoin(
 			teamMembers,
@@ -76,11 +81,23 @@ export async function addTeamMember(
 		.limit(1);
 	if (existing) throw new Error("This user is already a team member");
 
-	await db.insert(teamMembers).values({ teamId, userId: user.id, role });
-	await db
-		.update(teams)
-		.set({ updatedAt: new Date() })
-		.where(eq(teams.id, teamId));
+	await withTransaction(async (tx) => {
+		await tx.insert(teamMembers).values({ teamId, userId: user.id, role });
+		await createNotification(
+			{
+				recipientId: user.id,
+				actorId,
+				type: "team_member_added",
+				teamId,
+				message: `added you to ${context.teamName}`,
+			},
+			tx,
+		);
+		await tx
+			.update(teams)
+			.set({ updatedAt: new Date() })
+			.where(eq(teams.id, teamId));
+	});
 }
 
 // Change a team member's role as the team owner

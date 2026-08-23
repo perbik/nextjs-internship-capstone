@@ -99,6 +99,11 @@ export function moveTaskBetweenLists(
 		return currentLists;
 	}
 
+	// Invalid drag targets must leave the current board unchanged
+	if (!currentLists.some((list) => list.id === targetListId)) {
+		return currentLists;
+	}
+
 	const task = sourceList.tasks.find((item) => item.id === taskId);
 
 	if (!task) {
@@ -117,7 +122,10 @@ export function moveTaskBetweenLists(
 		}
 
 		const nextTasks = [...tasksWithoutMovedTask];
-		const nextPosition = Math.min(targetPosition, nextTasks.length);
+		const nextPosition = Math.max(
+			0,
+			Math.min(targetPosition, nextTasks.length),
+		);
 		nextTasks.splice(nextPosition, 0, { ...task, listId: targetListId });
 
 		return { ...list, tasks: nextTasks };

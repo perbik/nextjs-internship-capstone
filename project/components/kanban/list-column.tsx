@@ -61,6 +61,7 @@ export function ListColumn({
 	return (
 		<section
 			ref={setSortableColumnRef}
+			aria-label={`${list.name} column`}
 			style={{
 				transform: CSS.Transform.toString(columnTransform),
 				transition: columnTransition,

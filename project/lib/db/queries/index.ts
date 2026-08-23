@@ -4,6 +4,7 @@ export * from "./calendar";
 export * from "./comments";
 export * from "./dashboard";
 export * from "./lists";
+export * from "./notifications";
 export * from "./project-members";
 export * from "./projects";
 export * from "./tasks";

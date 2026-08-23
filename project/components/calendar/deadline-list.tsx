@@ -43,11 +43,11 @@ export function DeadlineList({ events, anchor, page }: DeadlineListProps) {
 			className="mb-6 space-y-3 rounded-2xl border border-border bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)] sm:p-5"
 			aria-labelledby="monthly-deadlines-heading"
 		>
-			<div className="flex items-center justify-between gap-3">
-				<div className="flex items-center gap-2">
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<div className="flex min-w-0 items-center gap-2">
 					<h2
 						id="monthly-deadlines-heading"
-						className="font-display text-lg font-extrabold text-foreground"
+						className="font-display text-lg font-extrabold leading-tight text-foreground sm:text-xl"
 					>
 						Deadlines this month
 					</h2>
@@ -61,7 +61,7 @@ export function DeadlineList({ events, anchor, page }: DeadlineListProps) {
 				{pageCount > 1 && (
 					<Pagination
 						aria-label="Deadline pages"
-						className="mx-0 w-auto justify-end"
+						className="mx-0 w-auto shrink-0 justify-end"
 					>
 						<PaginationContent>
 							<PaginationItem>
@@ -126,7 +126,7 @@ function DeadlineRow({ event }: DeadlineRowProps) {
 	return (
 		<Link
 			href={href}
-			className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,.06)] transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-[0_8px_20px_rgba(0,0,0,.07)]"
+			className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 shadow-[0_1px_3px_rgba(0,0,0,.06)] transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-[0_8px_20px_rgba(0,0,0,.07)] sm:px-4"
 		>
 			<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
 				<EventIcon aria-hidden="true" size={14} />

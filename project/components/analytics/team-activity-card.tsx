@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -88,13 +89,13 @@ export function TeamActivityCard({
 			) : (
 				<ul className="flex-1 divide-y divide-border px-5 sm:px-6">
 					{activities.map((activity) => (
-						<li key={activity.id} className="py-2">
-							<div className="flex items-start justify-between gap-4">
+						<li key={activity.id} className="py-2.5">
+							<div className="grid gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4">
 								<p className="min-w-0 text-[13px] font-medium text-foreground sm:text-sm">
 									{activity.actorName} {activity.action}
 									{activity.taskTitle ? `: ${activity.taskTitle}` : ""}
 								</p>
-								<time className="shrink-0 text-[11px] text-muted-foreground sm:text-xs">
+								<time className="text-[11px] text-muted-foreground sm:text-xs">
 									{activity.date}
 								</time>
 							</div>
@@ -120,9 +121,34 @@ export function TeamActivityCard({
 			)}
 
 			{totalPages > 1 && (
-				<Pagination className="mt-auto border-t border-border px-5 py-1.5 sm:px-6">
-					<PaginationContent>
-						<PaginationItem>
+				<Pagination className="mt-auto border-t border-border px-3 py-1.5 sm:px-6">
+					<PaginationContent className="w-full justify-between sm:w-auto sm:justify-center">
+						<PaginationItem className="sm:hidden">
+							<PaginationLink
+								href={activityPageHref(page - 1, selectedScope)}
+								disabled={page === 1}
+								size="icon"
+								aria-label="Previous activity page"
+							>
+								<ChevronLeft aria-hidden="true" />
+							</PaginationLink>
+						</PaginationItem>
+						<PaginationItem className="sm:hidden">
+							<span className="text-xs font-semibold text-muted-foreground">
+								Page {page} of {totalPages}
+							</span>
+						</PaginationItem>
+						<PaginationItem className="sm:hidden">
+							<PaginationLink
+								href={activityPageHref(page + 1, selectedScope)}
+								disabled={page >= totalPages}
+								size="icon"
+								aria-label="Next activity page"
+							>
+								<ChevronRight aria-hidden="true" />
+							</PaginationLink>
+						</PaginationItem>
+						<PaginationItem className="hidden sm:block">
 							<PaginationPrevious
 								href={activityPageHref(page - 1, selectedScope)}
 								disabled={page === 1}
@@ -130,7 +156,7 @@ export function TeamActivityCard({
 						</PaginationItem>
 						{pageItems.map((item) =>
 							typeof item === "number" ? (
-								<PaginationItem key={item}>
+								<PaginationItem key={item} className="hidden sm:block">
 									<PaginationLink
 										href={activityPageHref(item, selectedScope)}
 										isActive={item === page}
@@ -140,12 +166,12 @@ export function TeamActivityCard({
 									</PaginationLink>
 								</PaginationItem>
 							) : (
-								<PaginationItem key={item}>
+								<PaginationItem key={item} className="hidden sm:block">
 									<PaginationEllipsis />
 								</PaginationItem>
 							),
 						)}
-						<PaginationItem>
+						<PaginationItem className="hidden sm:block">
 							<PaginationNext
 								href={activityPageHref(page + 1, selectedScope)}
 								disabled={page >= totalPages}

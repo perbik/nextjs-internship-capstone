@@ -136,7 +136,7 @@ export function DashboardLayout({
 					</div>
 				</header>
 
-				<main className="min-w-0 overflow-x-hidden px-4 pt-6 sm:px-6">
+				<main className="min-w-0 overflow-x-hidden px-4 pb-6 pt-6 sm:px-6">
 					<div className="mx-auto w-full min-w-0 max-w-360">{children}</div>
 				</main>
 			</div>

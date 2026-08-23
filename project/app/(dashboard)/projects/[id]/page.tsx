@@ -144,45 +144,49 @@ export default async function ProjectPage({
 								>
 									{status.label}
 								</Badge>
-								<Badge
-									variant="outline"
-									className="gap-1.5 rounded-full border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground"
-								>
-									<CalendarDays
-										className="size-3.5 text-brand"
-										aria-hidden="true"
-									/>
-									{dateLabel}
-								</Badge>
 							</div>
 							<p className="mt-0.5 max-w-2xl truncate text-sm text-muted-foreground">
 								{project.description || "No project description"}
 							</p>
 						</div>
 					</div>
-					<div className="flex flex-wrap items-center gap-2 sm:gap-1">
-						<ProjectCollaborators members={members} />
-						{actorRole && (
-							<ProjectCollaboratorsDialog
-								projectId={project.id}
-								members={members}
-								actorRole={actorRole}
-								eligibleMembers={availableTeamMembers}
+					<div className="border-t border-border pt-3 lg:flex lg:items-center lg:gap-2 lg:border-0 lg:pt-0">
+						<div className="mb-2 flex items-center gap-2 lg:mb-0">
+							<ProjectCollaborators members={members} />
+							<Badge
+								variant="outline"
+								className="gap-1.5 rounded-full border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground"
+							>
+								<CalendarDays
+									className="size-3.5 text-brand"
+									aria-hidden="true"
+								/>
+								{dateLabel}
+							</Badge>
+						</div>
+						<div className="grid grid-cols-2 gap-2 lg:flex lg:items-center">
+							{actorRole && (
+								<ProjectCollaboratorsDialog
+									projectId={project.id}
+									members={members}
+									actorRole={actorRole}
+									eligibleMembers={availableTeamMembers}
+								/>
+							)}
+							<ProjectActions
+								project={{
+									id: project.id,
+									name: project.name,
+									description: project.description,
+									status: project.status,
+									dueDate: project.dueDate?.toISOString() ?? null,
+								}}
+								canManage={canManage}
+								canDelete={canDelete}
+								variant="manage"
+								labels={labels}
 							/>
-						)}
-						<ProjectActions
-							project={{
-								id: project.id,
-								name: project.name,
-								description: project.description,
-								status: project.status,
-								dueDate: project.dueDate?.toISOString() ?? null,
-							}}
-							canManage={canManage}
-							canDelete={canDelete}
-							variant="manage"
-							labels={labels}
-						/>
+						</div>
 					</div>
 				</div>
 			</section>

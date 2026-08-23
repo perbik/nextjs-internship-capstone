@@ -39,7 +39,7 @@ export function ProjectCollaboratorsDialog({
 					type="button"
 					variant="outline"
 					size="sm"
-					className="rounded-full"
+					className="w-full rounded-full lg:w-auto"
 				>
 					<Users size={15} />
 					Manage Collaborators

@@ -109,7 +109,7 @@ function MemberCard({
 	index: number;
 }) {
 	return (
-		<Card className="border-0 bg-background p-4 shadow-none">
+		<Card className="border-0 bg-background p-3 shadow-none sm:p-4">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
 				<div className="flex min-w-0 flex-1 items-center gap-3">
 					<Avatar className="size-10 shrink-0">
@@ -120,7 +120,7 @@ function MemberCard({
 							{getInitials(member.name)}
 						</AvatarFallback>
 					</Avatar>
-					<div className="min-w-0">
+					<div className="min-w-0 flex-1">
 						<div className="flex flex-wrap items-center gap-2">
 							<p className="truncate text-sm font-bold text-foreground dark:text-white">
 								{member.name}
@@ -133,9 +133,13 @@ function MemberCard({
 						<p className="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
 							<Mail size={12} /> {member.email}
 						</p>
+						<p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground sm:hidden">
+							<FolderKanban size={13} /> {projectCount}{" "}
+							{projectCount === 1 ? "project" : "projects"}
+						</p>
 					</div>
 				</div>
-				<span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+				<span className="hidden shrink-0 items-center gap-1 text-xs text-muted-foreground sm:flex">
 					<FolderKanban size={13} /> {projectCount}{" "}
 					{projectCount === 1 ? "project" : "projects"}
 				</span>

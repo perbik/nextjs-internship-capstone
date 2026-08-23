@@ -69,7 +69,7 @@ export function AddTeamMemberDialog({ teams }: AddTeamMemberDialogProps) {
 				</Button>
 			</DialogTrigger>
 
-			<DialogContent className="sm:max-w-xl">
+			<DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-y-auto p-5 sm:max-w-xl sm:p-6">
 				<DialogHeader>
 					<DialogTitle>Add Team Member</DialogTitle>
 					<DialogDescription>
@@ -77,7 +77,7 @@ export function AddTeamMemberDialog({ teams }: AddTeamMemberDialogProps) {
 					</DialogDescription>
 				</DialogHeader>
 
-				<form action={action} className="space-y-5">
+				<form action={action} className="space-y-4 sm:space-y-5">
 					<input type="hidden" name="role" value={role} />
 
 					<div className="space-y-2">
@@ -138,7 +138,7 @@ export function AddTeamMemberDialog({ teams }: AddTeamMemberDialogProps) {
 
 					<TeamActionStatus state={state} />
 
-					<DialogFooter>
+					<DialogFooter className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:flex">
 						<Button
 							type="button"
 							variant="outline"

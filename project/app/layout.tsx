@@ -18,6 +18,9 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
 	title: "Brix — Project Management",
 	description: "Break projects down and build progress up with your team.",
+	icons: {
+		icon: "/brix-logo.svg",
+	},
 };
 
 export default function RootLayout({

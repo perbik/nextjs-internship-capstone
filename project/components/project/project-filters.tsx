@@ -91,14 +91,14 @@ export function ProjectFilters({
 				})}
 			</fieldset>
 
-			<div className="flex flex-wrap items-center justify-between gap-3">
+			<div className="flex items-center justify-between gap-2 sm:gap-3">
 				<DropdownMenu open={isRoleMenuOpen} onOpenChange={setIsRoleMenuOpen}>
 					<DropdownMenuTrigger asChild>
 						<Button
 							type="button"
 							variant="outline"
 							aria-label={`Filter projects by role. Current filter: ${selectedRoleLabel}`}
-							className="flex h-8 w-44 items-center justify-between rounded-full border-input bg-card px-5 font-display text-xs font-semibold uppercase tracking-[0.325px] text-foreground"
+							className="flex h-8 w-36 items-center justify-between rounded-full border-input bg-card px-4 font-display text-[11px] font-semibold uppercase tracking-[0.325px] text-foreground sm:w-44 sm:px-5 sm:text-xs"
 						>
 							<span>{selectedRoleLabel}</span>
 							<ChevronDown

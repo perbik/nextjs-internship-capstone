@@ -105,8 +105,8 @@ export function TaskFilters({
 		: null;
 
 	return (
-		<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-			<div className="w-full [&_input]:h-7 [&_input]:py-1 sm:w-72 lg:w-80">
+		<div className="grid min-w-0 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:flex-1 sm:flex-wrap">
+			<div className="min-w-0 [&_input]:h-8 [&_input]:py-1 sm:w-72 lg:w-80">
 				<SearchBar
 					initialValue={query}
 					placeholder="Search tasks"

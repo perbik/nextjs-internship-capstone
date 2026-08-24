@@ -28,7 +28,7 @@ const LIST_POSITION_SCHEMA = z.object({
 
 const LIST_ACTION_MESSAGES = new Set([
 	"You must be signed in",
-	"Your ProjectFlow account is not synchronized yet",
+	"Your Brix account is not synchronized yet",
 	"You do not have permission to manage this list",
 	"A project must keep at least one completed column",
 	"You do not have permission to add lists to this project",

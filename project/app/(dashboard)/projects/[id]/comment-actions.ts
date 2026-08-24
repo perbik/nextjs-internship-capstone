@@ -20,7 +20,7 @@ const COMMENT_ID_SCHEMA = z.uuid("Comment must be a valid ID");
 const TASK_ID_SCHEMA = z.uuid("Task must be a valid ID");
 const COMMENT_ACTION_MESSAGES = new Set([
 	"You must be signed in",
-	"Your ProjectFlow account is not synchronized yet",
+	"Your Brix account is not synchronized yet",
 	"You do not have access to this task",
 	"You can only edit your own comments",
 	"You can only delete your own comments",

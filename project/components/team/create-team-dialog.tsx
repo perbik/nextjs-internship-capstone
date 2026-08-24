@@ -20,7 +20,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TextareaWithCounter } from "@/components/ui/textarea-with-counter";
 
-export function CreateTeamDialog() {
+interface CreateTeamDialogProps {
+	description?: string;
+	triggerVariant?: "default" | "dashboardOnboarding";
+}
+
+export function CreateTeamDialog({
+	description = "Create a team for members and their shared projects.",
+	triggerVariant = "default",
+}: CreateTeamDialogProps = {}) {
 	const router = useRouter();
 	const formRef = useRef<HTMLFormElement>(null);
 	const [open, setOpen] = useState(false);
@@ -40,16 +48,32 @@ export function CreateTeamDialog() {
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button className="h-11 px-5">
-					<Plus /> Create Team
+				<Button
+					className={
+						triggerVariant === "dashboardOnboarding"
+							? "h-20 w-full justify-start gap-3 rounded-xl border-border bg-surface-subtle px-4 py-3 text-left text-sm text-foreground hover:border-brand/30 hover:bg-brand/5 dark:hover:bg-brand/10"
+							: "h-11 px-5"
+					}
+					variant={
+						triggerVariant === "dashboardOnboarding" ? "outline" : "default"
+					}
+				>
+					{triggerVariant === "dashboardOnboarding" ? (
+						<span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
+							<Plus size={14} />
+						</span>
+					) : (
+						<Plus />
+					)}
+					{triggerVariant === "dashboardOnboarding"
+						? "Create a Team First"
+						: "Create Team"}
 				</Button>
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-120">
 				<DialogHeader>
 					<DialogTitle>Create a team</DialogTitle>
-					<DialogDescription>
-						Create a team for members and their shared projects.
-					</DialogDescription>
+					<DialogDescription>{description}</DialogDescription>
 				</DialogHeader>
 				<form ref={formRef} action={action} className="space-y-4">
 					<div className="space-y-2">

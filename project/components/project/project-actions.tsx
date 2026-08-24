@@ -99,11 +99,16 @@ export function ProjectActions({
 						className={
 							variant === "compact"
 								? "size-9"
-								: "h-9 w-full rounded-full px-3 lg:w-auto lg:px-5"
+								: "h-9 min-w-0 w-full rounded-full px-2 text-xs sm:px-3 sm:text-sm lg:w-auto lg:px-5"
 						}
 					>
-						<Pencil aria-hidden="true" />
-						{variant === "manage" && "Manage Project"}
+						<Pencil className="shrink-0" aria-hidden="true" />
+						{variant === "manage" && (
+							<>
+								<span className="sm:hidden">Edit Project</span>
+								<span className="hidden sm:inline">Manage Project</span>
+							</>
+						)}
 					</Button>
 				)}
 			</div>

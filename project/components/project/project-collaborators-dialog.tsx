@@ -39,10 +39,12 @@ export function ProjectCollaboratorsDialog({
 					type="button"
 					variant="outline"
 					size="sm"
-					className="w-full rounded-full lg:w-auto"
+					aria-label="Manage project collaborators"
+					className="min-w-0 w-full rounded-full px-2 text-xs sm:px-3 sm:text-sm lg:w-auto"
 				>
-					<Users size={15} />
-					Manage Collaborators
+					<Users className="shrink-0" size={15} aria-hidden="true" />
+					<span className="sm:hidden">Collaborators</span>
+					<span className="hidden sm:inline">Manage Collaborators</span>
 				</Button>
 			</DialogTrigger>
 			<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">

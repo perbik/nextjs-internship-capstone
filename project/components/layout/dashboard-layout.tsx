@@ -93,12 +93,12 @@ export function DashboardLayout({
 		navigation[0];
 
 	return (
-		<div className="flex min-h-screen w-full min-w-0 bg-background text-foreground">
+		<div className="flex min-h-screen w-full max-w-full min-w-0 overflow-x-hidden bg-background text-foreground">
 			<aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card lg:flex">
 				<SidebarContent pathname={pathname} />
 			</aside>
 
-			<div className="w-0 min-w-0 flex-1">
+			<div className="min-w-0 max-w-full flex-1 overflow-x-hidden">
 				<header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-4 sm:px-6">
 					<Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
 						<SheetTrigger asChild>
@@ -136,8 +136,10 @@ export function DashboardLayout({
 					</div>
 				</header>
 
-				<main className="min-w-0 overflow-x-hidden px-4 pb-6 pt-6 sm:px-6">
-					<div className="mx-auto w-full min-w-0 max-w-360">{children}</div>
+				<main className="w-full min-w-0 max-w-full overflow-x-hidden px-4 pb-6 pt-6 sm:px-6">
+					<div className="mx-auto w-full min-w-0 max-w-360 overflow-x-hidden">
+						{children}
+					</div>
 				</main>
 			</div>
 		</div>

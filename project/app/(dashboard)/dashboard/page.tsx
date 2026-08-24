@@ -4,6 +4,7 @@ import { RecentProjectsPanel } from "@/components/dashboard/recent-projects-pane
 import { CreateProjectModal } from "@/components/project/create-project-modal";
 import { MetricCard } from "@/components/shared/metric-card";
 import { DashboardCreateTaskModal } from "@/components/task/create-task-modal";
+import { CreateTeamDialog } from "@/components/team/create-team-dialog";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import {
 	getDashboardData,
@@ -20,6 +21,7 @@ export default async function DashboardPage() {
 			getTaskCreationOptions(user.id),
 		]);
 	const name = user.firstName || user.email.split("@")[0];
+	const canCreateProject = manageableTeams.length > 0;
 	const metrics = [
 		{
 			label: "Active Projects",
@@ -63,10 +65,17 @@ export default async function DashboardPage() {
 			<div className="grid gap-5 lg:grid-cols-2">
 				<DashboardQuickActions
 					createProjectAction={
-						<CreateProjectModal
-							teams={manageableTeams}
-							triggerVariant="dashboard"
-						/>
+						canCreateProject ? (
+							<CreateProjectModal
+								teams={manageableTeams}
+								triggerVariant="dashboard"
+							/>
+						) : (
+							<CreateTeamDialog
+								description="Every project belongs to a team. Create one to start a project."
+								triggerVariant="dashboardOnboarding"
+							/>
+						)
 					}
 					createTaskAction={
 						<DashboardCreateTaskModal projects={taskCreationProjects} />

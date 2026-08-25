@@ -93,13 +93,13 @@ export function DashboardLayout({
 		navigation[0];
 
 	return (
-		<div className="flex min-h-screen w-full max-w-full min-w-0 overflow-x-hidden bg-background text-foreground">
-			<aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card lg:flex">
+		<div className="min-h-screen w-full max-w-full min-w-0 overflow-x-hidden bg-background text-foreground">
+			<aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-border bg-card lg:flex">
 				<SidebarContent pathname={pathname} />
 			</aside>
 
-			<div className="min-w-0 max-w-full flex-1 overflow-x-hidden">
-				<header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-4 sm:px-6">
+			<div className="min-w-0 max-w-full overflow-x-hidden lg:pl-60">
+				<header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-4 sm:px-6 lg:left-60">
 					<Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
 						<SheetTrigger asChild>
 							<Button
@@ -136,7 +136,7 @@ export function DashboardLayout({
 					</div>
 				</header>
 
-				<main className="w-full min-w-0 max-w-full overflow-x-hidden px-4 pb-6 pt-6 sm:px-6">
+				<main className="w-full min-w-0 max-w-full overflow-x-hidden px-4 pb-6 pt-20 sm:px-6">
 					<div className="mx-auto w-full min-w-0 max-w-360 overflow-x-hidden">
 						{children}
 					</div>

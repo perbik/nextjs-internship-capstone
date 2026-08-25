@@ -121,7 +121,7 @@ export default async function ProjectPage({
 	const dateLabel = project.dueDate ? `Due on ${formattedDate}` : "No due date";
 
 	return (
-		<div className="min-w-0 max-w-full space-y-3">
+		<div className="w-full min-w-0 max-w-full overflow-x-hidden space-y-3">
 			<section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
 				<div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
 					<div className="flex min-w-0 items-start gap-3">
@@ -151,7 +151,7 @@ export default async function ProjectPage({
 						</div>
 					</div>
 					<div className="border-t border-border pt-3 lg:flex lg:items-center lg:gap-2 lg:border-0 lg:pt-0">
-						<div className="mb-2 flex items-center gap-2 lg:mb-0">
+						<div className="mb-2 flex flex-wrap items-center gap-2 lg:mb-0">
 							<ProjectCollaborators members={members} />
 							<Badge
 								variant="outline"

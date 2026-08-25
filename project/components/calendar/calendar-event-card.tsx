@@ -77,9 +77,15 @@ export function CalendarEventStack({
 			{events.length > limit && (
 				<Link
 					href={moreHref}
-					className="block rounded px-1 text-[10px] font-medium text-muted-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+					aria-label={`${events.length - limit} more events`}
+					className="block truncate whitespace-nowrap rounded px-1 text-[10px] font-medium leading-4 text-muted-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
 				>
-					+{events.length - limit} more
+					<span aria-hidden="true" className="sm:hidden">
+						+{events.length - limit}
+					</span>
+					<span aria-hidden="true" className="hidden sm:inline">
+						+{events.length - limit} more
+					</span>
 				</Link>
 			)}
 		</div>

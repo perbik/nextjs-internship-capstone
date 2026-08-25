@@ -86,7 +86,7 @@ export function SearchBar({
 				value={value}
 				onChange={(event) => setValue(event.target.value)}
 				placeholder={placeholder}
-				className={`w-full bg-card py-2 pl-10 pr-10 text-sm text-foreground focus-visible:ring-brand/30 ${
+				className={`w-full bg-card py-2 pl-10 pr-10 text-base text-foreground focus-visible:ring-brand/30 md:text-sm ${
 					variant === "pill" ? "h-11 rounded-full" : "rounded-lg"
 				}`}
 			/>

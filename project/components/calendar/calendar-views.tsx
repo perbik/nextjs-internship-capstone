@@ -50,7 +50,7 @@ export function MonthCalendarView({
 			})}
 		>
 			<WeekdayHeader compact />
-			<div className="grid min-w-0 grid-cols-7 auto-rows-15.75 pt-1">
+			<div className="grid min-w-0 grid-cols-7 auto-rows-20 pt-1">
 				{days.map((date) => {
 					const key = dateKey(date);
 					const isToday = key === todayKey;

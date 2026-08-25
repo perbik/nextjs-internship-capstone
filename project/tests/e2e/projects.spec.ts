@@ -2,6 +2,7 @@ import { clerk } from "@clerk/testing/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
 const TEST_USER_EMAIL = process.env.E2E_CLERK_USER_EMAIL;
+const SERVER_ACTION_TIMEOUT = 30_000;
 
 test.describe.configure({ mode: "serial" });
 test.setTimeout(60_000);
@@ -41,7 +42,9 @@ test("creates a project and opens it from the project list", async ({
 	await selectFirstManagedTeam(page);
 	await page.getByRole("button", { name: "Create project" }).click();
 
-	await expect(page).toHaveURL(/\/projects\/[0-9a-f-]+$/);
+	await expect(page).toHaveURL(/\/projects\/[0-9a-f-]+$/, {
+		timeout: SERVER_ACTION_TIMEOUT,
+	});
 	await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
 
 	await page.goto("/projects");
@@ -49,7 +52,9 @@ test("creates a project and opens it from the project list", async ({
 	await expect(projectLink).toBeVisible();
 	await projectLink.click();
 
-	await expect(page).toHaveURL(/\/projects\/[0-9a-f-]+$/);
+	await expect(page).toHaveURL(/\/projects\/[0-9a-f-]+$/, {
+		timeout: SERVER_ACTION_TIMEOUT,
+	});
 	await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
 });
 

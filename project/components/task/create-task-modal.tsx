@@ -1,6 +1,7 @@
 "use client";
 
 import { MoreHorizontal, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
 	type ButtonHTMLAttributes,
 	forwardRef,
@@ -153,6 +154,7 @@ function TaskModal({
 	trigger: customTrigger,
 	showTrigger = true,
 }: TaskModalProps) {
+	const router = useRouter();
 	const isEditing = Boolean(task);
 	const modalId = isEditing
 		? `edit-task:${task?.id}`
@@ -169,8 +171,11 @@ function TaskModal({
 	);
 
 	useEffect(() => {
-		if (state.success) closeModal();
-	}, [closeModal, state]);
+		if (!state.success) return;
+
+		closeModal();
+		router.refresh();
+	}, [closeModal, router, state.success]);
 
 	const triggerDisabled = isEditing
 		? false

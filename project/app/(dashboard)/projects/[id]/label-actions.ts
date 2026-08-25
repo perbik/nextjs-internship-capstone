@@ -14,7 +14,7 @@ export interface LabelActionState {
 const LABEL_ID_SCHEMA = z.uuid("Label must be a valid ID");
 const LABEL_ACTION_MESSAGES = new Set([
 	"You must be signed in",
-	"Your ProjectFlow account is not synchronized yet",
+	"Your Brix account is not synchronized yet",
 	"You do not have permission to create project labels",
 	"You do not have permission to delete this label",
 	"A label with this name already exists",

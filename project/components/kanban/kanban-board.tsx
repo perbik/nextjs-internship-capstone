@@ -91,7 +91,7 @@ export function KanbanBoard({
 			onDragEnd={handleDragEnd}
 			onDragCancel={handleDragCancel}
 		>
-			<div className="min-w-0 max-w-full overflow-hidden rounded-2xl bg-board">
+			<div className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl bg-board [contain:layout_paint]">
 				<div className="flex min-h-17 flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
 					<div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
 						<div className="min-w-0 flex-1">{filterControl}</div>
@@ -119,7 +119,7 @@ export function KanbanBoard({
 						/>
 					</div>
 				</div>
-				<div className="kanban-scrollbar flex h-127 w-full min-w-0 items-start gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain px-5 pb-5">
+				<div className="kanban-scrollbar flex h-127 w-full min-w-0 max-w-full items-start gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain px-5 pb-5">
 					<SortableContext
 						items={boardLists.map((list) => `list-${list.id}`)}
 						strategy={horizontalListSortingStrategy}

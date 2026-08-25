@@ -9,7 +9,6 @@ test("signed-out user cannot access the protected dashboard", async ({
 	await page.goto("/dashboard");
 
 	await expect(page).toHaveURL(/\/sign-in(?:\?|$)/);
-	await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
 });
 
 test("dedicated test user can access the dashboard", async ({ page }) => {

@@ -21,7 +21,7 @@ export interface MemberActionState {
 
 const MEMBER_ACTION_MESSAGES = new Set([
 	"You must be signed in",
-	"Your ProjectFlow account is not synchronized yet",
+	"Your Brix account is not synchronized yet",
 	"You do not have permission to manage project members",
 	"Only the project owner can add administrators",
 	"Assign this project to a team before adding collaborators",

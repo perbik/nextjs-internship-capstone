@@ -26,7 +26,7 @@ const UUID_SCHEMA = z.uuid();
 
 const TASK_ACTION_MESSAGES = new Set([
 	"You must be signed in",
-	"Your ProjectFlow account is not synchronized yet",
+	"Your Brix account is not synchronized yet",
 	"You do not have access to this task list",
 	"The assignee must be a member of this project",
 	"A label cannot be assigned more than once",
